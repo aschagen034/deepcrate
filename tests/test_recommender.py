@@ -3,6 +3,7 @@ import pytest
 from recommender import (
     calculate_tag_similarity,
     find_strongest_artist_pair,
+    find_third_artist,
 )
 
 
@@ -67,3 +68,30 @@ def test_strongest_pair_requires_two_artists():
 
     with pytest.raises(ValueError, match="At least two artists"):
         find_strongest_artist_pair(artist_tags)
+
+
+def test_find_third_artist_compatible_with_both_seeds():
+    artist_tags = {
+        "Chris Lake": ["house", "tech house", "electronic"],
+        "FISHER": ["house", "tech house", "dance"],
+        "Disclosure": ["house", "garage", "electronic"],
+        "Cloonee": ["house", "tech house", "electronic", "dance"],
+    }
+    strongest_pair = ("Chris Lake", "FISHER")
+
+    result = find_third_artist(artist_tags, strongest_pair)
+
+    assert result == "Cloonee"
+
+
+def test_find_third_artist_returns_none_without_shared_tags():
+    artist_tags = {
+        "Chris Lake": ["house", "tech house"],
+        "FISHER": ["house", "electronic"],
+        "Metallica": ["metal", "thrash metal"],
+    }
+    strongest_pair = ("Chris Lake", "FISHER")
+
+    result = find_third_artist(artist_tags, strongest_pair)
+
+    assert result is None

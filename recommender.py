@@ -49,3 +49,37 @@ def find_strongest_artist_pair(
                 best_score = score
 
     return best_pair
+
+
+def find_third_artist(
+    artist_tags: dict[str, list[str]],
+    strongest_pair: tuple[str, str],
+) -> str | None:
+    first_artist, second_artist = strongest_pair
+
+    best_artist = None
+    best_score = 0.0
+
+    for artist_name, tags in artist_tags.items():
+        if artist_name in strongest_pair:
+            continue
+
+        similarity_to_first = calculate_tag_similarity(
+            tags,
+            artist_tags[first_artist],
+        )
+        similarity_to_second = calculate_tag_similarity(
+            tags,
+            artist_tags[second_artist],
+        )
+
+        candidate_score = min(
+            similarity_to_first,
+            similarity_to_second,
+        )
+
+        if candidate_score > best_score:
+            best_artist = artist_name
+            best_score = candidate_score
+
+    return best_artist
