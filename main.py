@@ -1,7 +1,8 @@
-from lastfm_client import get_artist_tags
+from lastfm_client import get_artist_tags, get_similar_artists
 from recommender import (
     find_strongest_artist_pair,
     find_third_artist,
+    merge_similar_artists,
 )
 from spotify_client import authenticate, get_top_artists
 
@@ -50,6 +51,30 @@ def main():
 
     for artist_name in seed_artists:
         print(artist_name)
+
+    recommendations_by_seed = {}
+
+    for seed_artist in seed_artists:
+        recommendations_by_seed[seed_artist] = get_similar_artists(
+            seed_artist,
+        )
+
+    candidate_artists = merge_similar_artists(
+        recommendations_by_seed,
+    )
+
+    print(f"\nSimilar artist candidates ({len(candidate_artists)}):")
+
+    for candidate in candidate_artists:
+        relationships = ", ".join(
+            (
+                f"{seed_name} "
+                f"({candidate['similarities'][seed_name]:.2f})"
+            )
+            for seed_name in candidate["recommended_by"]
+        )
+
+        print(f"{candidate['name']} - recommended by: {relationships}")
 
 
 if __name__ == "__main__":
