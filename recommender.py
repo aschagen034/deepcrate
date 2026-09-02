@@ -21,3 +21,31 @@ def calculate_tag_similarity(
     shared_tags = tags_a & tags_b
 
     return len(shared_tags) / len(all_tags)
+
+
+def find_strongest_artist_pair(
+    artist_tags: dict[str, list[str]],
+) -> tuple[str, str]:
+    artist_names = list(artist_tags)
+
+    if len(artist_names) < 2:
+        raise ValueError("At least two artists are required")
+
+    best_pair = (artist_names[0], artist_names[1])
+    best_score = calculate_tag_similarity(
+        artist_tags[best_pair[0]],
+        artist_tags[best_pair[1]],
+    )
+
+    for index, artist_a in enumerate(artist_names):
+        for artist_b in artist_names[index + 1:]:
+            score = calculate_tag_similarity(
+                artist_tags[artist_a],
+                artist_tags[artist_b],
+            )
+
+            if score > best_score:
+                best_pair = (artist_a, artist_b)
+                best_score = score
+
+    return best_pair

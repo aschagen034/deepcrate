@@ -1,4 +1,9 @@
-from recommender import calculate_tag_similarity
+import pytest
+
+from recommender import (
+    calculate_tag_similarity,
+    find_strongest_artist_pair,
+)
 
 
 def test_partial_tag_overlap():
@@ -41,3 +46,24 @@ def test_tags_are_normalized():
     result = calculate_tag_similarity(artist_a, artist_b)
 
     assert result == 1.0
+
+
+def test_find_strongest_artist_pair():
+    artist_tags = {
+        "Chris Lake": ["house", "tech house", "electronic"],
+        "FISHER": ["house", "tech house", "electronic"],
+        "Disclosure": ["house", "garage", "electronic"],
+    }
+
+    result = find_strongest_artist_pair(artist_tags)
+
+    assert result == ("Chris Lake", "FISHER")
+
+
+def test_strongest_pair_requires_two_artists():
+    artist_tags = {
+        "Traumer": ["minimal", "microhouse"],
+    }
+
+    with pytest.raises(ValueError, match="At least two artists"):
+        find_strongest_artist_pair(artist_tags)
