@@ -83,3 +83,35 @@ def find_third_artist(
             best_score = candidate_score
 
     return best_artist
+
+
+def merge_similar_artists(
+    recommendations_by_seed: dict[str, list[dict]],
+) -> list[dict]:
+    merged_artists = {}
+    seed_names = {
+        seed_name.casefold()
+        for seed_name in recommendations_by_seed
+    }
+
+    for seed_name, similar_artists in recommendations_by_seed.items():
+        for artist in similar_artists:
+            artist_name = artist["name"]
+            artist_key = artist_name.casefold()
+
+            if artist_key in seed_names:
+                continue
+
+            if artist_key not in merged_artists:
+                merged_artists[artist_key] = {
+                    "name": artist_name,
+                    "recommended_by": [],
+                    "similarities": {},
+                }
+
+            merged_artists[artist_key]["recommended_by"].append(seed_name)
+            merged_artists[artist_key]["similarities"][seed_name] = (
+                artist["similarity"]
+            )
+
+    return list(merged_artists.values())

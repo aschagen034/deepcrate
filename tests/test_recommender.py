@@ -4,6 +4,7 @@ from recommender import (
     calculate_tag_similarity,
     find_strongest_artist_pair,
     find_third_artist,
+    merge_similar_artists
 )
 
 
@@ -95,3 +96,56 @@ def test_find_third_artist_returns_none_without_shared_tags():
     result = find_third_artist(artist_tags, strongest_pair)
 
     assert result is None
+
+
+def test_merge_similar_artists_tracks_seed_relationships():
+    recommendations_by_seed = {
+        "PAWSA": [
+            {"name": "Cloonee", "similarity": 1.0},
+            {"name": "ANOTR", "similarity": 0.736},
+            {"name": "Michael Bibi", "similarity": 0.868},
+        ],
+        "Michael Bibi": [
+            {"name": "Cloonee", "similarity": 0.8},
+            {"name": "ANOTR", "similarity": 0.9},
+            {"name": "PAWSA", "similarity": 0.85},
+        ],
+    }
+
+    result = merge_similar_artists(recommendations_by_seed)
+
+    assert result == [
+        {
+            "name": "Cloonee",
+            "recommended_by": ["PAWSA", "Michael Bibi"],
+            "similarities": {
+                "PAWSA": 1.0,
+                "Michael Bibi": 0.8,
+            },
+        },
+        {
+            "name": "ANOTR",
+            "recommended_by": ["PAWSA", "Michael Bibi"],
+            "similarities": {
+                "PAWSA": 0.736,
+                "Michael Bibi": 0.9,
+            },
+        },
+    ]
+
+
+def test_merge_similar_artists_ignores_name_capitalization():
+    recommendations_by_seed = {
+        "PAWSA": [
+            {"name": "FISHER", "similarity": 0.7},
+        ],
+        "ANOTR": [
+            {"name": "Fisher", "similarity": 0.6},
+        ],
+    }
+
+    result = merge_similar_artists(recommendations_by_seed)
+
+    assert len(result) == 1
+    assert result[0]["name"] == "FISHER"
+    assert result[0]["recommended_by"] == ["PAWSA", "ANOTR"]
