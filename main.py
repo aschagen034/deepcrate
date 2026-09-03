@@ -1,10 +1,18 @@
-from lastfm_client import get_artist_tags, get_similar_artists
+from lastfm_client import (
+    get_artist_tags,
+    get_artist_top_tracks,
+    get_similar_artists,
+)
 from recommender import (
     find_strongest_artist_pair,
     find_third_artist,
     merge_similar_artists,
 )
-from spotify_client import authenticate, get_top_artists
+from spotify_client import (
+    authenticate,
+    get_top_artists,
+    search_track,
+)
 
 
 def main():
@@ -75,6 +83,53 @@ def main():
         )
 
         print(f"{candidate['name']} - recommended by: {relationships}")
+
+    seed_track_candidates = []
+
+    print("\nSeed artist tracks:")
+    for seed_artist in seed_artists:
+        lastfm_tracks = get_artist_top_tracks(
+            seed_artist,
+            limit=5,
+        )
+
+        for lastfm_track in lastfm_tracks:
+            spotify_track = search_track(
+                spotify,
+                lastfm_track["name"],
+                lastfm_track["artist_name"],
+            )
+
+            if spotify_track is None:
+                print(
+                    f"Not found on Spotify: "
+                    f"{lastfm_track['name']} - "
+                    f"{lastfm_track['artist_name']}"
+                )
+                continue
+
+            candidate_track = spotify_track.copy()
+            candidate_track["source"] = "seed_artist"
+            candidate_track["source_artist"] = seed_artist
+            candidate_track["lastfm_listeners"] = (
+                lastfm_track["listeners"]
+            )
+            candidate_track["lastfm_playcount"] = (
+                lastfm_track["playcount"]
+            )
+
+            seed_track_candidates.append(candidate_track)
+
+            print(
+                f"{candidate_track['name']} - "
+                f"{candidate_track['artist_name']} "
+                f"({candidate_track['album_name']})"
+            )
+
+    print(
+        f"\nVerified seed track candidates: "
+        f"{len(seed_track_candidates)}"
+    )
 
 
 if __name__ == "__main__":
