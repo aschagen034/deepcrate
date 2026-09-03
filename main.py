@@ -131,6 +131,114 @@ def main():
         f"{len(seed_track_candidates)}"
     )
 
+    related_artists_per_seed = 4
+    tracks_per_related_artist = 5
+
+    seed_name_keys = {
+        seed_artist.casefold()
+        for seed_artist in seed_artists
+    }
+    candidate_lookup = {
+        candidate["name"].casefold(): candidate
+        for candidate in candidate_artists
+    }
+
+    selected_related_artists = []
+    selected_related_keys = set()
+
+    for seed_artist in seed_artists:
+        selected_for_seed = 0
+
+        for related_artist in recommendations_by_seed[seed_artist]:
+            artist_key = related_artist["name"].casefold()
+
+            if artist_key in seed_name_keys:
+                continue
+
+            if artist_key in selected_related_keys:
+                continue
+
+            merged_artist = candidate_lookup.get(artist_key)
+
+            if merged_artist is None:
+                continue
+
+            selected_related_artists.append(merged_artist)
+            selected_related_keys.add(artist_key)
+            selected_for_seed += 1
+
+            if selected_for_seed == related_artists_per_seed:
+                break
+
+    print("\nRelated artists selected for track testing:")
+
+    for related_artist in selected_related_artists:
+        print(
+            f"{related_artist['name']} - recommended by: "
+            f"{', '.join(related_artist['recommended_by'])}"
+        )
+
+    related_track_candidates = []
+
+    print("\nRelated artist tracks:")
+
+    for related_artist in selected_related_artists:
+        related_artist_name = related_artist["name"]
+        lastfm_tracks = get_artist_top_tracks(
+            related_artist_name,
+            limit=tracks_per_related_artist,
+        )
+
+        for lastfm_track in lastfm_tracks:
+            spotify_track = search_track(
+                spotify,
+                lastfm_track["name"],
+                lastfm_track["artist_name"],
+            )
+
+            if spotify_track is None:
+                print(
+                    f"Not found on Spotify: "
+                    f"{lastfm_track['name']} - "
+                    f"{lastfm_track['artist_name']}"
+                )
+                continue
+
+            candidate_track = spotify_track.copy()
+            candidate_track["source"] = "similar_artist"
+            candidate_track["source_artist"] = related_artist_name
+            candidate_track["recommended_by"] = (
+                related_artist["recommended_by"].copy()
+            )
+            candidate_track["artist_similarities"] = (
+                related_artist["similarities"].copy()
+            )
+            candidate_track["lastfm_listeners"] = (
+                lastfm_track["listeners"]
+            )
+            candidate_track["lastfm_playcount"] = (
+                lastfm_track["playcount"]
+            )
+
+            related_track_candidates.append(candidate_track)
+
+            print(
+                f"{candidate_track['name']} - "
+                f"{candidate_track['artist_name']} "
+                f"({candidate_track['album_name']})"
+            )
+
+    print(
+        f"\nVerified related track candidates: "
+        f"{len(related_track_candidates)}"
+    )
+
+    candidate_tracks = (
+        seed_track_candidates
+        + related_track_candidates
+    )
+
+    print(f"\nTotal candidate tracks: {len(candidate_tracks)}")
 
 if __name__ == "__main__":
     main()
