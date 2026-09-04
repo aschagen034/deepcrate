@@ -1,3 +1,28 @@
+def interleave_tracks_by_artist(
+    tracks: list[dict],
+) -> list[dict]:
+    tracks_by_artist = {}
+
+    for track in tracks:
+        artist_id = track["artist_id"]
+
+        if artist_id not in tracks_by_artist:
+            tracks_by_artist[artist_id] = []
+
+        tracks_by_artist[artist_id].append(track)
+
+    interleaved_tracks = []
+
+    while any(tracks_by_artist.values()):
+        for artist_tracks in tracks_by_artist.values():
+            if artist_tracks:
+                interleaved_tracks.append(
+                    artist_tracks.pop(0)
+                )
+
+    return interleaved_tracks
+
+
 def build_playlist(
     ranked_tracks: list[dict],
     target_size: int = 50,
@@ -24,4 +49,4 @@ def build_playlist(
         seen_track_ids.add(track_id)
         artist_track_counts[artist_id] = artist_count + 1
 
-    return selected_tracks
+    return interleave_tracks_by_artist(selected_tracks)

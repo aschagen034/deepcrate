@@ -1,4 +1,4 @@
-from playlist_generator import build_playlist
+from playlist_generator import build_playlist, interleave_tracks_by_artist
 
 
 def make_track(
@@ -47,8 +47,8 @@ def test_build_playlist_limits_tracks_per_artist():
         for track in result
     ] == [
         "track-1",
-        "track-2",
         "track-4",
+        "track-2",
     ]
 
 
@@ -68,3 +68,26 @@ def test_build_playlist_stops_at_target_size():
     )
 
     assert len(result) == 50
+
+
+def test_interleave_tracks_spreads_artists_apart():
+    tracks = [
+        make_track("artist-1-track-1", "artist-1"),
+        make_track("artist-1-track-2", "artist-1"),
+        make_track("artist-2-track-1", "artist-2"),
+        make_track("artist-2-track-2", "artist-2"),
+        make_track("artist-3-track-1", "artist-3"),
+    ]
+
+    result = interleave_tracks_by_artist(tracks)
+
+    assert [
+        track["spotify_id"]
+        for track in result
+    ] == [
+        "artist-1-track-1",
+        "artist-2-track-1",
+        "artist-3-track-1",
+        "artist-1-track-2",
+        "artist-2-track-2",
+    ]
