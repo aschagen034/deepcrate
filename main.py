@@ -14,6 +14,7 @@ from spotify_client import (
     get_top_artists,
     search_track,
 )
+from playlist_generator import build_playlist
 
 
 def main():
@@ -252,6 +253,22 @@ def main():
             f"{track['artist_name']} - "
             f"Score: {track['recommendation_score']:.3f} - "
             f"Source: {track['source']}"
+        )
+
+    final_tracks = build_playlist(
+        ranked_candidates,
+        target_size=50,
+        max_tracks_per_artist=5,
+    )
+
+    print(f"\nFinal DeepCrate tracks ({len(final_tracks)}):")
+
+    for position, track in enumerate(final_tracks, start=1):
+        print(
+            f"{position}. "
+            f"{track['name']} - "
+            f"{track['artist_name']} - "
+            f"Score: {track['recommendation_score']:.3f}"
         )
 
 
