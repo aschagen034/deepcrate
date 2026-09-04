@@ -10,7 +10,9 @@ from recommender import (
     rank_candidates,
 )
 from spotify_client import (
+    add_tracks_to_playlist,
     authenticate,
+    create_playlist,
     get_top_artists,
     search_track,
 )
@@ -270,6 +272,39 @@ def main():
             f"{track['artist_name']} - "
             f"Score: {track['recommendation_score']:.3f}"
         )
+
+    confirmation = input(
+        "\nCreate this playlist in Spotify? [y/N]: "
+    ).strip().lower()
+
+    if confirmation != "y":
+        print("Playlist creation cancelled.")
+        return
+
+    playlist = create_playlist(
+        spotify,
+        name="DeepCrate Weekly",
+        description=(
+            "A playlist generated from Spotify listening "
+            "history and Last.fm recommendations."
+        ),
+    )
+
+    track_uris = [
+        track["spotify_uri"]
+        for track in final_tracks
+    ]
+
+    add_tracks_to_playlist(
+        spotify,
+        playlist["spotify_id"],
+        track_uris,
+    )
+
+    print(
+        f"\nCreated playlist: "
+        f"{playlist['spotify_url']}"
+    )
 
 
 if __name__ == "__main__":

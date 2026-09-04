@@ -82,3 +82,24 @@ def create_playlist(
         "name": playlist["name"],
         "spotify_url": playlist["external_urls"]["spotify"],
     }
+
+
+def add_tracks_to_playlist(
+    spotify,
+    playlist_id: str,
+    track_uris: list[str],
+) -> str | None:
+    if not track_uris:
+        return None
+
+    if len(track_uris) > 100:
+        raise ValueError(
+            "Spotify accepts at most 100 playlist items per request"
+        )
+
+    response = spotify.playlist_add_items(
+        playlist_id,
+        track_uris,
+    )
+
+    return response["snapshot_id"]
