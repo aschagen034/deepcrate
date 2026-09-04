@@ -6,7 +6,13 @@ from spotipy.oauth2 import SpotifyOAuth
 def authenticate() -> spotipy.Spotify:
     """Authenticate the user and return a Spotify API client."""
     load_dotenv()
-    auth_manager = SpotifyOAuth(scope="user-read-private user-top-read")
+    auth_manager = SpotifyOAuth(
+        scope=(
+            "user-read-private "
+            "user-top-read "
+            "playlist-modify-private"
+        )
+    )
     return spotipy.Spotify(auth_manager=auth_manager)
 
 
@@ -58,3 +64,21 @@ def search_track(
             }
 
     return None
+
+
+def create_playlist(
+    spotify,
+    name: str,
+    description: str = "",
+) -> dict:
+    playlist = spotify.current_user_playlist_create(
+        name=name,
+        public=False,
+        description=description,
+    )
+
+    return {
+        "spotify_id": playlist["id"],
+        "name": playlist["name"],
+        "spotify_url": playlist["external_urls"]["spotify"],
+    }
