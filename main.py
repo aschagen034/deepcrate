@@ -7,6 +7,7 @@ from recommender import (
     find_strongest_artist_pair,
     find_third_artist,
     merge_similar_artists,
+    rank_candidates,
 )
 from spotify_client import (
     authenticate,
@@ -239,6 +240,20 @@ def main():
     )
 
     print(f"\nTotal candidate tracks: {len(candidate_tracks)}")
+
+    ranked_candidates = rank_candidates(candidate_tracks)
+
+    print("\nRanked track candidates:")
+
+    for position, track in enumerate(ranked_candidates, start=1):
+        print(
+            f"{position}. "
+            f"{track['name']} - "
+            f"{track['artist_name']} - "
+            f"Score: {track['recommendation_score']:.3f} - "
+            f"Source: {track['source']}"
+        )
+
 
 if __name__ == "__main__":
     main()
