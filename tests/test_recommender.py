@@ -5,6 +5,7 @@ from recommender import (
     find_strongest_artist_pair,
     find_third_artist,
     merge_similar_artists,
+    rank_candidates,
     score_track_candidate,
 )
 
@@ -197,3 +198,55 @@ def test_unknown_track_source_scores_zero():
     result = score_track_candidate(track)
 
     assert result == 0.0
+
+
+def test_rank_candidates_highest_score_first():
+    candidate_tracks = [
+        {
+            "name": "Single relationship",
+            "source": "similar_artist",
+            "artist_similarities": {
+                "PAWSA": 0.6,
+            },
+        },
+        {
+            "name": "Seed track",
+            "source": "seed_artist",
+        },
+        {
+            "name": "Multiple relationships",
+            "source": "similar_artist",
+            "artist_similarities": {
+                "PAWSA": 0.7,
+                "Michael Bibi": 0.6,
+            },
+        },
+    ]
+
+    result = rank_candidates(candidate_tracks)
+
+    assert [
+        track["name"]
+        for track in result
+    ] == [
+        "Multiple relationships",
+        "Seed track",
+        "Single relationship",
+    ]
+
+    assert result[0]["recommendation_score"] == pytest.approx(1.3)
+    assert result[1]["recommendation_score"] == 1.0
+    assert result[2]["recommendation_score"] == 0.6
+
+
+def test_rank_candidates_does_not_change_original_tracks():
+    candidate_tracks = [
+        {
+            "name": "Seed track",
+            "source": "seed_artist",
+        },
+    ]
+
+    rank_candidates(candidate_tracks)
+
+    assert "recommendation_score" not in candidate_tracks[0]

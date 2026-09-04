@@ -126,3 +126,20 @@ def score_track_candidate(track: dict) -> float:
         return sum(similarities.values())
 
     return 0.0
+
+
+def rank_candidates(candidate_tracks: list[dict]) -> list[dict]:
+    scored_tracks = []
+
+    for track in candidate_tracks:
+        scored_track = track.copy()
+        scored_track["recommendation_score"] = (
+            score_track_candidate(track)
+        )
+        scored_tracks.append(scored_track)
+
+    return sorted(
+        scored_tracks,
+        key=lambda track: track["recommendation_score"],
+        reverse=True,
+    )
