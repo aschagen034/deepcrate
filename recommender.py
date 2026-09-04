@@ -115,3 +115,14 @@ def merge_similar_artists(
             )
 
     return list(merged_artists.values())
+
+
+def score_track_candidate(track: dict) -> float:
+    if track.get("source") == "seed_artist":
+        return 1.0
+
+    if track.get("source") == "similar_artist":
+        similarities = track.get("artist_similarities", {})
+        return sum(similarities.values())
+
+    return 0.0

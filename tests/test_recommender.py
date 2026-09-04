@@ -4,7 +4,8 @@ from recommender import (
     calculate_tag_similarity,
     find_strongest_artist_pair,
     find_third_artist,
-    merge_similar_artists
+    merge_similar_artists,
+    score_track_candidate,
 )
 
 
@@ -149,3 +150,50 @@ def test_merge_similar_artists_ignores_name_capitalization():
     assert len(result) == 1
     assert result[0]["name"] == "FISHER"
     assert result[0]["recommended_by"] == ["PAWSA", "ANOTR"]
+
+
+def test_seed_artist_track_score():
+    track = {
+        "source": "seed_artist",
+    }
+
+    result = score_track_candidate(track)
+
+    assert result == 1.0
+
+
+def test_similar_artist_track_score():
+    track = {
+        "source": "similar_artist",
+        "artist_similarities": {
+            "PAWSA": 0.8,
+        },
+    }
+
+    result = score_track_candidate(track)
+
+    assert result == 0.8
+
+
+def test_multiple_seed_relationships_increase_track_score():
+    track = {
+        "source": "similar_artist",
+        "artist_similarities": {
+            "PAWSA": 0.7,
+            "Michael Bibi": 0.6,
+        },
+    }
+
+    result = score_track_candidate(track)
+
+    assert result == pytest.approx(1.3)
+
+
+def test_unknown_track_source_scores_zero():
+    track = {
+        "source": "unknown",
+    }
+
+    result = score_track_candidate(track)
+
+    assert result == 0.0
