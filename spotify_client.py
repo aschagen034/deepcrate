@@ -66,6 +66,63 @@ def search_track(
     return None
 
 
+def search_artist_tracks(
+    spotify,
+    artist_name: str,
+    limit: int = 5,
+) -> list[dict]:
+    if limit < 1 or limit > 10:
+        raise ValueError("Track limit must be between 1 and 10")
+
+    response = spotify.search(
+        q=f"artist:{artist_name}",
+        type="track",
+        limit=10,
+    )
+
+    tracks = response.get(
+        "tracks",
+        {},
+    ).get("items", [])
+
+    matched_tracks = []
+    seen_track_ids = set()
+
+    for track in tracks:
+        matching_artist = next(
+            (
+                artist
+                for artist in track["artists"]
+                if artist["name"].casefold()
+                == artist_name.casefold()
+            ),
+            None,
+        )
+
+        if matching_artist is None:
+            continue
+
+        if track["id"] in seen_track_ids:
+            continue
+
+        matched_tracks.append(
+            {
+                "spotify_id": track["id"],
+                "spotify_uri": track["uri"],
+                "name": track["name"],
+                "artist_name": matching_artist["name"],
+                "artist_id": matching_artist["id"],
+                "album_name": track["album"]["name"],
+            }
+        )
+        seen_track_ids.add(track["id"])
+
+        if len(matched_tracks) == limit:
+            break
+
+    return matched_tracks
+
+
 def create_playlist(
     spotify,
     name: str,
