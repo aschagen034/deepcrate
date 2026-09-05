@@ -1,6 +1,10 @@
 import pytest
 
-from spotify_client import search_artist_tracks, find_owned_playlist_by_name
+from spotify_client import (
+    find_owned_playlist_by_name,
+    replace_playlist_tracks,
+    search_artist_tracks,
+)
 
 
 class FakeSpotify:
@@ -26,6 +30,27 @@ class FakePlaylistSpotify:
     def current_user_playlists(self, **arguments):
         self.playlist_calls.append(arguments)
         return self.pages.pop(0)
+
+
+class FakePlaylistUpdateSpotify:
+    def __init__(self):
+        self.replace_calls = []
+
+    def playlist_replace_items(
+        self,
+        playlist_id,
+        track_uris,
+    ):
+        self.replace_calls.append(
+            {
+                "playlist_id": playlist_id,
+                "track_uris": track_uris,
+            }
+        )
+
+        return {
+            "snapshot_id": "new-snapshot",
+        }
 
 
 def make_spotify_track(
@@ -207,3 +232,45 @@ def test_find_owned_playlist_by_name_returns_none_when_missing():
     )
 
     assert result is None
+
+
+def test_replace_playlist_tracks_replaces_all_items():
+    spotify = FakePlaylistUpdateSpotify()
+    track_uris = [
+        "spotify:track:track-1",
+        "spotify:track:track-2",
+    ]
+
+    result = replace_playlist_tracks(
+        spotify,
+        playlist_id="playlist-1",
+        track_uris=track_uris,
+    )
+
+    assert result == "new-snapshot"
+    assert spotify.replace_calls == [
+        {
+            "playlist_id": "playlist-1",
+            "track_uris": track_uris,
+        }
+    ]
+
+
+def test_replace_playlist_tracks_rejects_more_than_100_items():
+    spotify = FakePlaylistUpdateSpotify()
+    track_uris = [
+        f"spotify:track:{index}"
+        for index in range(101)
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match="at most 100",
+    ):
+        replace_playlist_tracks(
+            spotify,
+            playlist_id="playlist-1",
+            track_uris=track_uris,
+        )
+
+    assert spotify.replace_calls == []

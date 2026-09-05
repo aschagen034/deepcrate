@@ -199,3 +199,21 @@ def find_owned_playlist_by_name(
             return None
 
         offset += response.get("limit", 50)
+
+
+def replace_playlist_tracks(
+    spotify,
+    playlist_id: str,
+    track_uris: list[str],
+) -> str:
+    if len(track_uris) > 100:
+        raise ValueError(
+            "Spotify accepts at most 100 playlist items per request"
+        )
+
+    response = spotify.playlist_replace_items(
+        playlist_id,
+        track_uris,
+    )
+
+    return response["snapshot_id"]
