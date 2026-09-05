@@ -1,6 +1,5 @@
 from lastfm_client import (
     get_artist_tags,
-    get_artist_top_tracks,
     get_similar_artists,
 )
 from recommender import (
@@ -14,7 +13,7 @@ from spotify_client import (
     authenticate,
     create_playlist,
     get_top_artists,
-    search_track,
+    search_artist_tracks,
 )
 from playlist_generator import build_playlist
 
@@ -24,6 +23,10 @@ def main():
 
     spotify = authenticate()
     current_user = spotify.current_user()
+
+    if current_user is None:
+        raise RuntimeError("Spotify did not return a current user profile")
+
     top_artists = get_top_artists(spotify)
 
     print(f"Connected to Spotify as: {current_user['display_name']}")
@@ -92,35 +95,16 @@ def main():
 
     print("\nSeed artist tracks:")
     for seed_artist in seed_artists:
-        lastfm_tracks = get_artist_top_tracks(
+        spotify_tracks = search_artist_tracks(
+            spotify,
             seed_artist,
             limit=5,
         )
 
-        for lastfm_track in lastfm_tracks:
-            spotify_track = search_track(
-                spotify,
-                lastfm_track["name"],
-                lastfm_track["artist_name"],
-            )
-
-            if spotify_track is None:
-                print(
-                    f"Not found on Spotify: "
-                    f"{lastfm_track['name']} - "
-                    f"{lastfm_track['artist_name']}"
-                )
-                continue
-
+        for spotify_track in spotify_tracks:
             candidate_track = spotify_track.copy()
             candidate_track["source"] = "seed_artist"
             candidate_track["source_artist"] = seed_artist
-            candidate_track["lastfm_listeners"] = (
-                lastfm_track["listeners"]
-            )
-            candidate_track["lastfm_playcount"] = (
-                lastfm_track["playcount"]
-            )
 
             seed_track_candidates.append(candidate_track)
 
@@ -135,7 +119,7 @@ def main():
         f"{len(seed_track_candidates)}"
     )
 
-    related_artists_per_seed = 4
+    related_artists_per_seed = 5
     tracks_per_related_artist = 5
 
     seed_name_keys = {
@@ -188,26 +172,13 @@ def main():
 
     for related_artist in selected_related_artists:
         related_artist_name = related_artist["name"]
-        lastfm_tracks = get_artist_top_tracks(
+        spotify_tracks = search_artist_tracks(
+            spotify,
             related_artist_name,
             limit=tracks_per_related_artist,
         )
 
-        for lastfm_track in lastfm_tracks:
-            spotify_track = search_track(
-                spotify,
-                lastfm_track["name"],
-                lastfm_track["artist_name"],
-            )
-
-            if spotify_track is None:
-                print(
-                    f"Not found on Spotify: "
-                    f"{lastfm_track['name']} - "
-                    f"{lastfm_track['artist_name']}"
-                )
-                continue
-
+        for spotify_track in spotify_tracks:
             candidate_track = spotify_track.copy()
             candidate_track["source"] = "similar_artist"
             candidate_track["source_artist"] = related_artist_name
@@ -216,12 +187,6 @@ def main():
             )
             candidate_track["artist_similarities"] = (
                 related_artist["similarities"].copy()
-            )
-            candidate_track["lastfm_listeners"] = (
-                lastfm_track["listeners"]
-            )
-            candidate_track["lastfm_playcount"] = (
-                lastfm_track["playcount"]
             )
 
             related_track_candidates.append(candidate_track)
