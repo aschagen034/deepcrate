@@ -12,7 +12,9 @@ from spotify_client import (
     add_tracks_to_playlist,
     authenticate,
     create_playlist,
+    find_owned_playlist_by_name,
     get_top_artists,
+    replace_playlist_tracks,
     search_artist_tracks,
 )
 from playlist_generator import build_playlist
@@ -239,35 +241,55 @@ def main():
         )
 
     confirmation = input(
-        "\nCreate this playlist in Spotify? [y/N]: "
+        "\nCreate or update this playlist in Spotify? [y/N]: "
     ).strip().lower()
 
     if confirmation != "y":
-        print("Playlist creation cancelled.")
+        print("Playlist update cancelled.")
         return
 
-    playlist = create_playlist(
-        spotify,
-        name="DeepCrate Weekly",
-        description=(
-            "A playlist generated from Spotify listening "
-            "history and Last.fm recommendations."
-        ),
-    )
+    playlist_name = "DeepCrate Weekly"
 
     track_uris = [
         track["spotify_uri"]
         for track in final_tracks
     ]
 
-    add_tracks_to_playlist(
+    existing_playlist = find_owned_playlist_by_name(
         spotify,
-        playlist["spotify_id"],
-        track_uris,
+        user_id=current_user["id"],
+        playlist_name=playlist_name,
     )
 
+    if existing_playlist:
+        replace_playlist_tracks(
+            spotify,
+            existing_playlist["spotify_id"],
+            track_uris,
+        )
+
+        playlist = existing_playlist
+        action = "Updated"
+    else:
+        playlist = create_playlist(
+            spotify,
+            name=playlist_name,
+            description=(
+                "A playlist generated from Spotify listening "
+                "history and Last.fm recommendations."
+            ),
+        )
+
+        add_tracks_to_playlist(
+            spotify,
+            playlist["spotify_id"],
+            track_uris,
+        )
+
+        action = "Created"
+
     print(
-        f"\nCreated playlist: "
+        f"\n{action} playlist: "
         f"{playlist['spotify_url']}"
     )
 

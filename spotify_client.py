@@ -11,7 +11,8 @@ def authenticate() -> spotipy.Spotify:
             "user-read-private "
             "user-top-read "
             "playlist-read-private "
-            "playlist-modify-private"
+            "playlist-modify-private "
+            "playlist-modify-public"
         )
     )
     return spotipy.Spotify(auth_manager=auth_manager)
