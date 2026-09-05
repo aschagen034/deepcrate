@@ -1,4 +1,12 @@
-from playlist_generator import build_playlist, interleave_tracks_by_artist
+import random
+
+import pytest
+
+from playlist_generator import (
+    add_ranking_variety,
+    build_playlist,
+    interleave_tracks_by_artist,
+)
 
 
 def make_track(
@@ -91,3 +99,83 @@ def test_interleave_tracks_spreads_artists_apart():
         "artist-1-track-2",
         "artist-2-track-2",
     ]
+
+
+def test_add_ranking_variety_is_repeatable_with_seed():
+    ranked_tracks = [
+        {
+            **make_track(f"track-{index}", f"artist-{index}"),
+            "recommendation_score": 1.0,
+        }
+        for index in range(10)
+    ]
+
+    first_result = add_ranking_variety(
+        ranked_tracks,
+        rng=random.Random(42),
+    )
+    second_result = add_ranking_variety(
+        ranked_tracks,
+        rng=random.Random(42),
+    )
+
+    assert [
+        track["spotify_id"]
+        for track in first_result
+    ] == [
+        track["spotify_id"]
+        for track in second_result
+    ]
+
+
+def test_add_ranking_variety_changes_equal_score_order():
+    ranked_tracks = [
+        {
+            **make_track(f"track-{index}", f"artist-{index}"),
+            "recommendation_score": 1.0,
+        }
+        for index in range(10)
+    ]
+
+    first_result = add_ranking_variety(
+        ranked_tracks,
+        rng=random.Random(1),
+    )
+    second_result = add_ranking_variety(
+        ranked_tracks,
+        rng=random.Random(2),
+    )
+
+    assert [
+        track["spotify_id"]
+        for track in first_result
+    ] != [
+        track["spotify_id"]
+        for track in second_result
+    ]
+
+
+def test_add_ranking_variety_preserves_large_score_difference():
+    ranked_tracks = [
+        {
+            **make_track("high-score", "artist-1"),
+            "recommendation_score": 10.0,
+        },
+        {
+            **make_track("low-score", "artist-2"),
+            "recommendation_score": 1.0,
+        },
+    ]
+
+    result = add_ranking_variety(
+        ranked_tracks,
+        variation=0.20,
+        rng=random.Random(42),
+    )
+
+    assert result[0]["spotify_id"] == "high-score"
+
+
+def test_add_ranking_variety_rejects_invalid_variation():
+    with pytest.raises(ValueError):
+        add_ranking_variety([], variation=1.1)

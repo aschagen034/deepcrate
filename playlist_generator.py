@@ -1,3 +1,6 @@
+import random
+
+
 def interleave_tracks_by_artist(
     tracks: list[dict],
 ) -> list[dict]:
@@ -21,6 +24,40 @@ def interleave_tracks_by_artist(
                 )
 
     return interleaved_tracks
+
+
+def add_ranking_variety(
+    ranked_tracks: list[dict],
+    variation: float = 0.15,
+    rng: random.Random | None = None,
+) -> list[dict]:
+    if variation < 0 or variation > 1:
+        raise ValueError("Variation must be between 0 and 1")
+
+    if rng is None:
+        rng = random.Random()
+
+    varied_tracks = []
+
+    for track in ranked_tracks:
+        varied_score = (
+            track["recommendation_score"]
+            * rng.uniform(1 - variation, 1 + variation)
+        )
+
+        varied_tracks.append(
+            (varied_score, track)
+        )
+
+    varied_tracks.sort(
+        key=lambda item: item[0],
+        reverse=True,
+    )
+
+    return [
+        track
+        for _, track in varied_tracks
+    ]
 
 
 def build_playlist(

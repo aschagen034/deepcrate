@@ -17,7 +17,7 @@ from spotify_client import (
     replace_playlist_tracks,
     search_artist_tracks,
 )
-from playlist_generator import build_playlist
+from playlist_generator import build_playlist, add_ranking_variety
 
 
 def main():
@@ -74,6 +74,7 @@ def main():
     for seed_artist in seed_artists:
         recommendations_by_seed[seed_artist] = get_similar_artists(
             seed_artist,
+            limit=20,
         )
 
     candidate_artists = merge_similar_artists(
@@ -224,8 +225,13 @@ def main():
             f"Source: {track['source']}"
         )
 
-    final_tracks = build_playlist(
+    varied_candidates = add_ranking_variety(
         ranked_candidates,
+        variation=0.15,
+    )
+
+    final_tracks = build_playlist(
+        varied_candidates,
         target_size=50,
         max_tracks_per_artist=5,
     )
