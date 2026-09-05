@@ -10,6 +10,7 @@ def authenticate() -> spotipy.Spotify:
         scope=(
             "user-read-private "
             "user-top-read "
+            "playlist-read-private "
             "playlist-modify-private"
         )
     )
@@ -160,3 +161,41 @@ def add_tracks_to_playlist(
     )
 
     return response["snapshot_id"]
+
+
+def find_owned_playlist_by_name(
+    spotify,
+    user_id: str,
+    playlist_name: str,
+) -> dict | None:
+    offset = 0
+
+    while True:
+        response = spotify.current_user_playlists(
+            limit=50,
+            offset=offset,
+        )
+
+        for playlist in response.get("items", []):
+            same_name = (
+                playlist["name"].casefold()
+                == playlist_name.casefold()
+            )
+            owned_by_user = (
+                playlist["owner"]["id"] == user_id
+            )
+
+            if same_name and owned_by_user:
+                return {
+                    "spotify_id": playlist["id"],
+                    "name": playlist["name"],
+                    "spotify_url": (
+                        playlist["external_urls"]["spotify"]
+                    ),
+                    "public": playlist.get("public"),
+                }
+
+        if response.get("next") is None:
+            return None
+
+        offset += response.get("limit", 50)

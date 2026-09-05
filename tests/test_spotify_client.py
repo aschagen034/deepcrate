@@ -1,6 +1,6 @@
 import pytest
 
-from spotify_client import search_artist_tracks
+from spotify_client import search_artist_tracks, find_owned_playlist_by_name
 
 
 class FakeSpotify:
@@ -16,6 +16,16 @@ class FakeSpotify:
                 "items": self.tracks,
             },
         }
+
+
+class FakePlaylistSpotify:
+    def __init__(self, pages: list[dict]):
+        self.pages = pages
+        self.playlist_calls = []
+
+    def current_user_playlists(self, **arguments):
+        self.playlist_calls.append(arguments)
+        return self.pages.pop(0)
 
 
 def make_spotify_track(
@@ -112,3 +122,88 @@ def test_search_artist_tracks_rejects_invalid_limit(limit):
         )
 
     assert spotify.search_calls == []
+
+
+def test_find_owned_playlist_by_name_checks_ownership_and_pages():
+    spotify = FakePlaylistSpotify(
+        [
+            {
+                "items": [
+                    {
+                        "id": "followed-playlist",
+                        "name": "DeepCrate Weekly",
+                        "owner": {
+                            "id": "another-user",
+                        },
+                        "external_urls": {
+                            "spotify": "followed-url",
+                        },
+                        "public": True,
+                    },
+                ],
+                "next": "next-page",
+                "limit": 50,
+            },
+            {
+                "items": [
+                    {
+                        "id": "owned-playlist",
+                        "name": "deepcrate weekly",
+                        "owner": {
+                            "id": "current-user",
+                        },
+                        "external_urls": {
+                            "spotify": "owned-url",
+                        },
+                        "public": False,
+                    },
+                ],
+                "next": None,
+                "limit": 50,
+            },
+        ]
+    )
+
+    result = find_owned_playlist_by_name(
+        spotify,
+        user_id="current-user",
+        playlist_name="DeepCrate Weekly",
+    )
+
+    assert result == {
+        "spotify_id": "owned-playlist",
+        "name": "deepcrate weekly",
+        "spotify_url": "owned-url",
+        "public": False,
+    }
+
+    assert spotify.playlist_calls == [
+        {
+            "limit": 50,
+            "offset": 0,
+        },
+        {
+            "limit": 50,
+            "offset": 50,
+        },
+    ]
+
+
+def test_find_owned_playlist_by_name_returns_none_when_missing():
+    spotify = FakePlaylistSpotify(
+        [
+            {
+                "items": [],
+                "next": None,
+                "limit": 50,
+            },
+        ]
+    )
+
+    result = find_owned_playlist_by_name(
+        spotify,
+        user_id="current-user",
+        playlist_name="DeepCrate Weekly",
+    )
+
+    assert result is None
