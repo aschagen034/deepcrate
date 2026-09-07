@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# DeepCrate local playlist history
+.deepcrate_history.json
+.deepcrate_history.json.tmp

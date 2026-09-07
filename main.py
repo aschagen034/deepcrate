@@ -17,7 +17,16 @@ from spotify_client import (
     replace_playlist_tracks,
     search_artist_tracks,
 )
-from playlist_generator import build_playlist, add_ranking_variety
+from playlist_generator import (
+    add_ranking_variety,
+    build_playlist,
+)
+from history import (
+    filter_recent_tracks,
+    load_track_history,
+    record_playlist_tracks,
+    save_track_history,
+)
 
 
 def main():
@@ -225,13 +234,23 @@ def main():
             f"Source: {track['source']}"
         )
 
+    history_path = ".deepcrate_history.json"
+    track_history = load_track_history(history_path)
+
     varied_candidates = add_ranking_variety(
         ranked_candidates,
         variation=0.15,
     )
 
-    final_tracks = build_playlist(
+    history_filtered_candidates = filter_recent_tracks(
         varied_candidates,
+        track_history,
+        cooldown_days=28,
+        target_size=50,
+    )
+
+    final_tracks = build_playlist(
+        history_filtered_candidates,
         target_size=50,
         max_tracks_per_artist=5,
     )
@@ -293,6 +312,15 @@ def main():
         )
 
         action = "Created"
+
+    updated_history = record_playlist_tracks(
+        track_history,
+        final_tracks,
+    )
+    save_track_history(
+        updated_history,
+        history_path,
+    )
 
     print(
         f"\n{action} playlist: "
