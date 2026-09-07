@@ -7,6 +7,7 @@ from history import (
     load_track_history,
     record_playlist_tracks,
     save_track_history,
+    was_track_used_recently,
 )
 
 
@@ -147,3 +148,31 @@ def test_track_history_round_trip(tmp_path):
     loaded_history = load_track_history(history_path)
 
     assert loaded_history == history
+
+
+def test_was_track_used_recently_identifies_recent_track():
+    now = datetime(2026, 9, 5, tzinfo=timezone.utc)
+    history = {
+        "track-1": now - timedelta(days=7),
+    }
+
+    assert was_track_used_recently(
+        "track-1",
+        history,
+        cooldown_days=28,
+        now=now,
+    )
+
+
+def test_was_track_used_recently_rejects_expired_track():
+    now = datetime(2026, 9, 5, tzinfo=timezone.utc)
+    history = {
+        "track-1": now - timedelta(days=40),
+    }
+
+    assert not was_track_used_recently(
+        "track-1",
+        history,
+        cooldown_days=28,
+        now=now,
+    )

@@ -26,6 +26,7 @@ from history import (
     load_track_history,
     record_playlist_tracks,
     save_track_history,
+    was_track_used_recently,
 )
 
 
@@ -110,7 +111,7 @@ def main():
         spotify_tracks = search_artist_tracks(
             spotify,
             seed_artist,
-            limit=5,
+            limit=10,
         )
 
         for spotify_track in spotify_tracks:
@@ -132,7 +133,7 @@ def main():
     )
 
     related_artists_per_seed = 5
-    tracks_per_related_artist = 5
+    tracks_per_related_artist = 10
 
     seed_name_keys = {
         seed_artist.casefold()
@@ -254,6 +255,20 @@ def main():
         target_size=50,
         max_tracks_per_artist=5,
     )
+
+    reused_track_count = sum(
+        was_track_used_recently(
+            track["spotify_id"],
+            track_history,
+            cooldown_days=28,
+        )
+        for track in final_tracks
+    )
+    fresh_track_count = len(final_tracks) - reused_track_count
+
+    print("\nPlaylist freshness:")
+    print(f"Fresh tracks selected: {fresh_track_count}")
+    print(f"Recently used fallback tracks: {reused_track_count}")
 
     print(f"\nFinal DeepCrate tracks ({len(final_tracks)}):")
 

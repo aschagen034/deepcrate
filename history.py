@@ -56,7 +56,6 @@ def filter_recent_tracks(
     if now is None:
         now = datetime.now(timezone.utc)
 
-    cutoff = now - timedelta(days=cooldown_days)
 
     available_tracks = []
     recent_tracks = []
@@ -64,7 +63,12 @@ def filter_recent_tracks(
     for track in tracks:
         last_used = history.get(track["spotify_id"])
 
-        if last_used is not None and last_used >= cutoff:
+        if was_track_used_recently(
+            track["spotify_id"],
+            history,
+            cooldown_days=cooldown_days,
+            now=now,
+        ):
             recent_tracks.append((last_used, track))
         else:
             available_tracks.append(track)
@@ -123,3 +127,28 @@ def save_track_history(
     )
 
     temporary_path.replace(path)
+
+
+def was_track_used_recently(
+    track_id: str,
+    history: dict[str, datetime],
+    cooldown_days: int = 28,
+    now: datetime | None = None,
+) -> bool:
+    if cooldown_days < 0:
+        raise ValueError("Cooldown days cannot be negative")
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    if now.tzinfo is None:
+        raise ValueError("Current timestamp must include a timezone")
+
+    last_used = history.get(track_id)
+
+    if last_used is None:
+        return False
+
+    cutoff = now - timedelta(days=cooldown_days)
+
+    return last_used >= cutoff
