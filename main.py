@@ -1,4 +1,5 @@
 import argparse
+import logging
 
 from lastfm_client import (
     get_artist_tags,
@@ -31,6 +32,10 @@ from history import (
     was_track_used_recently,
 )
 
+from logging_config import configure_logging
+
+logger = logging.getLogger("deepcrate")
+
 def parse_args(
         arguments: list[str] | None = None,
 ) -> argparse.Namespace:
@@ -56,6 +61,7 @@ def main(
     dry_run: bool = False,
 ):
     print("DeepCrate starting...")
+    logger.info("Deepcrate run started")
 
     spotify = authenticate()
     current_user = spotify.current_user()
@@ -246,6 +252,11 @@ def main(
 
     print(f"\nTotal candidate tracks: {len(candidate_tracks)}")
 
+    logger.info(
+        "Collected %d candidate tracks",
+        len(candidate_tracks),
+    )
+
     ranked_candidates = rank_candidates(candidate_tracks)
 
     print("\nRanked track candidates:")
@@ -294,6 +305,13 @@ def main(
     print(f"Fresh tracks selected: {fresh_track_count}")
     print(f"Recently used fallback tracks: {reused_track_count}")
 
+    logger.info(
+        "Selected %d tracks: %d fresh, %d recent fallback",
+        len(final_tracks),
+        fresh_track_count,
+        reused_track_count,
+    )
+
     print(f"\nFinal DeepCrate tracks ({len(final_tracks)}):")
 
     for position, track in enumerate(final_tracks, start=1):
@@ -309,6 +327,9 @@ def main(
             "\nDry run complete. Spotify playlist and "
             "track history were not updated."
         )
+        logger.info(
+            "Dry run completed without updating Spotify or history"
+        )
         return
 
     if not auto_confirm:
@@ -318,6 +339,7 @@ def main(
 
         if confirmation != "y":
             print("Playlist update cancelled.")
+            logger.info("Playlist update cancelled by user")
             return
 
     playlist_name = "DeepCrate Weekly"
@@ -369,6 +391,14 @@ def main(
         history_path,
     )
 
+    logger.info(
+        "%s Spotify playlist '%s' with %d tracks",
+        action,
+        playlist_name,
+        len(final_tracks),
+    )
+    logger.info("DeepCrate run completed successfully")
+
     print(
         f"\n{action} playlist: "
         f"{playlist['spotify_url']}"
@@ -376,9 +406,14 @@ def main(
 
 
 if __name__ == "__main__":
+    configure_logging()
     args = parse_args()
 
-    main(
-        auto_confirm=args.yes,
-        dry_run=args.dry_run,
-    )
+    try:
+        main(
+            auto_confirm=args.yes,
+            dry_run=args.dry_run,
+        )
+    except Exception:
+        logger.exception("DeepCrate run failed")
+        raise
