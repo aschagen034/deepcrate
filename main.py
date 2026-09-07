@@ -1,3 +1,5 @@
+import argparse
+
 from lastfm_client import (
     get_artist_tags,
     get_similar_artists,
@@ -29,8 +31,30 @@ from history import (
     was_track_used_recently,
 )
 
+def parse_args(
+        arguments: list[str] | None = None,
+) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Generate a DeepCrate Spotify playlist,",
+    )
 
-def main():
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Update Spotify without asking for confirmation.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate the track list without updating Spotify."
+    )
+
+    return parser.parse_args(arguments)
+
+def main(
+    auto_confirm: bool = False,
+    dry_run: bool = False,
+):
     print("DeepCrate starting...")
 
     spotify = authenticate()
@@ -280,13 +304,21 @@ def main():
             f"Score: {track['recommendation_score']:.3f}"
         )
 
-    confirmation = input(
-        "\nCreate or update this playlist in Spotify? [y/N]: "
-    ).strip().lower()
-
-    if confirmation != "y":
-        print("Playlist update cancelled.")
+    if dry_run:
+        print(
+            "\nDry run complete. Spotify playlist and "
+            "track history were not updated."
+        )
         return
+
+    if not auto_confirm:
+        confirmation = input(
+            "\nCreate or update this playlist in Spotify? [y/N]: "
+        ).strip().lower()
+
+        if confirmation != "y":
+            print("Playlist update cancelled.")
+            return
 
     playlist_name = "DeepCrate Weekly"
 
@@ -344,4 +376,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+
+    main(
+        auto_confirm=args.yes,
+        dry_run=args.dry_run,
+    )
