@@ -312,7 +312,7 @@ Running the script without `-DryRun` updates the Spotify playlist.
 
 ## Weekly Windows Task
 
-DeepCrate can be registered with Windows Task Scheduler to run every Friday at 12:00 AM.
+DeepCrate can be registered with Windows Task Scheduler to run automatically on a chosen day and time. The example configuration below schedules it for Friday at 12:00 AM.
 
 From the project directory, run:
 
