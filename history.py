@@ -6,6 +6,11 @@ from pathlib import Path
 def load_track_history(
     history_path: str | Path,
 ) -> dict[str, datetime]:
+    """Load track usage timestamps from a JSON file and convert them to UTC.
+    
+    Return an empty dictionary for a missing, unreadable, or invalid JSON file.
+    Skip invalid entries and timestamps without timezone information.
+    """
     path = Path(history_path)
 
     if not path.exists():
@@ -35,6 +40,7 @@ def load_track_history(
         except ValueError:
             continue
 
+        # Ignore timestamps whose timezone cannot be determined reliably.
         if used_at.tzinfo is None:
             continue
 
@@ -50,6 +56,12 @@ def filter_recent_tracks(
     target_size: int = 50,
     now: datetime | None = None,
 ) -> list[dict]:
+    """Prefer tracks outside the cooldown period, preserving their input order.
+    
+    If fewer than target_size tracks qualify, append all recent tracks,
+    ordered from least recently used to most recently used.
+    The returned list is not trucnated to target_size.
+    """
     if cooldown_days < 0:
         raise ValueError("Cooldown days cannot be negative")
 
@@ -76,6 +88,7 @@ def filter_recent_tracks(
     if len(available_tracks) >= target_size:
         return available_tracks
 
+    # Reintroduce the least recently used tracks first when more candidates are needed.
     recent_tracks.sort(
         key=lambda item: item[0],
     )
@@ -91,6 +104,11 @@ def record_playlist_tracks(
     tracks: list[dict],
     used_at: datetime | None = None,
 ) -> dict[str, datetime]:
+    """Return a copy of the history with the supplied tracks marked as used.
+    
+    Store timestamps in UTC and leave the original history unchanged.
+    Use the current time when used_at is omitted.
+    """
     if used_at is None:
         used_at = datetime.now(timezone.utc)
 
@@ -110,6 +128,10 @@ def save_track_history(
     history: dict[str, datetime],
     history_path: str | Path,
 ) -> None:
+    """Save track history as JSON containing ISO-formatted UTC timestamps.
+    
+    Write to a temporary file before replacing the destination.
+    """
     path = Path(history_path)
 
     serialized_history = {
@@ -121,6 +143,7 @@ def save_track_history(
         f"{path.suffix}.tmp"
     )
 
+    # Finish writing the new history before replacing the existing file.
     temporary_path.write_text(
         json.dumps(serialized_history, indent=2),
         encoding="utf-8",
@@ -151,4 +174,5 @@ def was_track_used_recently(
 
     cutoff = now - timedelta(days=cooldown_days)
 
+    # A timestamp exactly at the cutoff still counts as recent.
     return last_used >= cutoff

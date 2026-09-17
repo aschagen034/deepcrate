@@ -7,6 +7,13 @@ LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
 
 
 def get_artist_tags(artist_name: str, limit: int = 10) -> list[str]:
+    """Fetch an artist's top Last.fm tags.
+    
+    Return names stripped of sourrounding whitespace and converted to lowercase,
+    skipping missing or empty names among the first limit tags.
+    """
+
+    # Load .env values before reading the Last.fm API key.
     load_dotenv()
     api_key = os.getenv("LASTFM_API_KEY")
 
@@ -28,6 +35,7 @@ def get_artist_tags(artist_name: str, limit: int = 10) -> list[str]:
 
     data = response.json()
 
+    # Check for API errors in the response body after checking the HTTP status.
     if "error" in data:
         raise RuntimeError(data.get("message", "Last.fm API request failed"))
 
@@ -44,6 +52,13 @@ def get_similar_artists(
     artist_name: str,
     limit: int = 10,
 ) -> list[dict]:
+    """Fetch similar artists from Last.fm.
+
+    Return artist names and numeric similarity scores, skipping entries
+    without a name.
+    """
+
+    # Load .env values before reading the Last.fm API key.
     load_dotenv()
     api_key = os.getenv("LASTFM_API_KEY")
 
@@ -66,6 +81,7 @@ def get_similar_artists(
 
     data = response.json()
 
+    # Check for API errors in the response body after checking the HTTP status.
     if "error" in data:
         raise RuntimeError(data.get("message", "Last.fm API request failed"))
 
@@ -88,6 +104,12 @@ def get_artist_top_tracks(
     artist_name: str,
     limit: int = 10,
 ) -> list[dict]:
+    """Fetch an artist's top tracks from Last.fm.
+    
+    Return tracks and artist names, listener and play counts, and Last.fm URLs,
+    skipping entries without a track name.
+    """
+    # Load .env values before reading the Last.fm API key.
     load_dotenv()
     api_key = os.getenv("LASTFM_API_KEY")
 
@@ -110,6 +132,7 @@ def get_artist_top_tracks(
 
     data = response.json()
 
+    # Check for API errors in the response body after checking the HTTP status.
     if "error" in data:
         raise RuntimeError(data.get("message", "Last.fm API request failed"))
     tracks = data.get(

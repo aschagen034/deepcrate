@@ -19,6 +19,7 @@ def authenticate() -> spotipy.Spotify:
 
 
 def get_top_artists(spotify, limit: int = 10) -> list[dict]:
+    """Return the user's top artists over Spotify's short-term time range."""
     response = spotify.current_user_top_artists(
         limit=limit,
         time_range="short_term",
@@ -31,6 +32,10 @@ def search_track(
     track_name: str,
     artist_name: str,
 ) -> dict | None:
+    """Return the first of five search results with an exact, case-insensitive artist match.
+
+    Return normalized track details, or None if no artist matches.
+    """
     query = f"track:{track_name} artist:{artist_name}"
 
     response = spotify.search(
@@ -73,6 +78,10 @@ def search_artist_tracks(
     artist_name: str,
     limit: int = 5,
 ) -> list[dict]:
+    """Return up to limit unique tracks with an exact, case-insensitive artist match.
+
+    Filter the first ten search results; fewer than limit tracks may qualify.
+    """
     if limit < 1 or limit > 10:
         raise ValueError("Track limit must be between 1 and 10")
 
@@ -130,6 +139,7 @@ def create_playlist(
     name: str,
     description: str = "",
 ) -> dict:
+    """Create a private playlist and return its ID, name, and Spotify URL."""
     playlist = spotify.current_user_playlist_create(
         name=name,
         public=False,
@@ -148,6 +158,10 @@ def add_tracks_to_playlist(
     playlist_id: str,
     track_uris: list[str],
 ) -> str | None:
+    """Append up to 100 track URIs and return the playlist snapshot ID.
+
+    Return None without making a request when no tracks are supplied.
+    """
     if not track_uris:
         return None
 
@@ -169,6 +183,10 @@ def find_owned_playlist_by_name(
     user_id: str,
     playlist_name: str,
 ) -> dict | None:
+    """Find the first playlist owned by user_id with a case-insensitive name match.
+
+    Search all available pages and return None if no match is found.
+    """
     offset = 0
 
     while True:
@@ -207,6 +225,10 @@ def replace_playlist_tracks(
     playlist_id: str,
     track_uris: list[str],
 ) -> str:
+    """Replace the playlist's contents with up to 100 track URIs.
+
+    An empty list clears the playlist. Return the playlist snapshot ID.
+    """
     if len(track_uris) > 100:
         raise ValueError(
             "Spotify accepts at most 100 playlist items per request"
