@@ -19,6 +19,7 @@ from spotify_client import (
     get_top_artists,
     replace_playlist_tracks,
     search_artist_tracks,
+    get_current_user,
 )
 from playlist_generator import (
     add_ranking_variety,
@@ -64,7 +65,7 @@ def main(
     logger.info("Deepcrate run started")
 
     spotify = authenticate()
-    current_user = spotify.current_user()
+    current_user = get_current_user(spotify)
 
     if current_user is None:
         raise RuntimeError("Spotify did not return a current user profile")

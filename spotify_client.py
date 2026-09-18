@@ -1,6 +1,122 @@
+import time
+from collections.abc import Callable, Collection
+from typing import TypeVar
+
+import requests
 import spotipy
 from dotenv import load_dotenv
+from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyOAuth
+
+from retry import run_with_retries
+
+Result = TypeVar("Result")
+
+SPOTIFY_RETRYABLE_STATUS_CODES = {
+    429,
+    500,
+    502,
+    503,
+    504,
+}
+
+
+class SpotifyTemporaryError(RuntimeError):
+    """Represent a temporary Spotify failure that may succeed later."""
+
+    def __init__(
+        self,
+        message: str,
+        retry_after: float | None = None,
+    ):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def _run_spotify_operation(
+    operation: Callable[[], Result],
+    operation_name: str,
+    sleep_func: Callable[[float], None] = time.sleep,
+    retryable_status_codes: Collection[int] | None = None,
+    retry_network_errors: bool = True,
+) -> Result:
+    """Run a Spotify operation with logged retry handling."""
+
+    if retryable_status_codes is None:
+        retryable_status_codes = (
+            SPOTIFY_RETRYABLE_STATUS_CODES
+        )
+
+    def send_request() -> Result:
+        try:
+            return operation()
+        except SpotifyException as error:
+            if error.http_status not in retryable_status_codes:
+                raise
+
+            # Quota exhaustion is not a short rolling-window rate limit.
+            # Let Task Scheduler retry the complete run later.
+            if error.reason == "QUOTA_EXCEEDED":
+                raise
+
+            retry_after = None
+
+            if error.http_status == 429:
+                retry_after_value = error.headers.get(
+                    "Retry-After"
+                )
+
+                if isinstance(
+                    retry_after_value,
+                    (str, int, float),
+                ):
+                    try:
+                        retry_after = float(
+                            retry_after_value
+                        )
+                    except ValueError:
+                        retry_after = None
+
+            raise SpotifyTemporaryError(
+                str(error),
+                retry_after=retry_after,
+            ) from error
+
+    def retry_delay(
+        error: Exception,
+        attempt: int,
+    ) -> float:
+        if (
+            isinstance(error, SpotifyTemporaryError)
+            and error.retry_after is not None
+        ):
+            return error.retry_after
+
+        return min(
+            2 ** (attempt - 1),
+            30.0,
+        )
+
+    retryable_exceptions: tuple[type[Exception], ...] = (
+        SpotifyTemporaryError,
+    )
+
+    if retry_network_errors:
+        retryable_exceptions += (
+            requests.Timeout,
+            requests.ConnectionError,
+        )
+
+    return run_with_retries(
+        send_request,
+        retryable_exceptions=retryable_exceptions,
+        operation_name=operation_name,
+        max_attempts=3,
+        base_delay=1.0,
+        max_delay=30.0,
+        sleep_func=sleep_func,
+        delay_for_exception=retry_delay,
+    )
 
 
 def authenticate() -> spotipy.Spotify:
@@ -15,14 +131,32 @@ def authenticate() -> spotipy.Spotify:
             "playlist-modify-public"
         )
     )
-    return spotipy.Spotify(auth_manager=auth_manager)
+    return spotipy.Spotify(
+        auth_manager=auth_manager,
+        requests_session=False,
+        requests_timeout=10,
+    )
+
+
+def get_current_user(
+    spotify,
+) -> dict | None:
+    """Return the authenticated Spotify user's profile."""
+
+    return _run_spotify_operation(
+        spotify.current_user,
+        operation_name="Spotify get current user",
+    )
 
 
 def get_top_artists(spotify, limit: int = 10) -> list[dict]:
     """Return the user's top artists over Spotify's short-term time range."""
-    response = spotify.current_user_top_artists(
-        limit=limit,
-        time_range="short_term",
+    response = _run_spotify_operation(
+        lambda: spotify.current_user_top_artists(
+            limit=limit,
+            time_range="short_term",
+        ),
+        operation_name="Spotify get top artists",
     )
     return response["items"]
 
@@ -38,10 +172,15 @@ def search_track(
     """
     query = f"track:{track_name} artist:{artist_name}"
 
-    response = spotify.search(
-        q=query,
-        type="track",
-        limit=5,
+    response = _run_spotify_operation(
+        lambda: spotify.search(
+            q=query,
+            type="track",
+            limit=5,
+        ),
+        operation_name=(
+            f"Spotify search for {track_name} by {artist_name}"
+        ),
     )
 
     tracks = response.get(
@@ -85,10 +224,15 @@ def search_artist_tracks(
     if limit < 1 or limit > 10:
         raise ValueError("Track limit must be between 1 and 10")
 
-    response = spotify.search(
-        q=f"artist:{artist_name}",
-        type="track",
-        limit=10,
+    response = _run_spotify_operation(
+        lambda: spotify.search(
+            q=f"artist:{artist_name}",
+            type="track",
+            limit=10,
+        ),
+        operation_name=(
+            f"Spotify search tracks for {artist_name}"
+        ),
     )
 
     tracks = response.get(
@@ -140,10 +284,15 @@ def create_playlist(
     description: str = "",
 ) -> dict:
     """Create a private playlist and return its ID, name, and Spotify URL."""
-    playlist = spotify.current_user_playlist_create(
-        name=name,
-        public=False,
-        description=description,
+    playlist = _run_spotify_operation(
+        lambda: spotify.current_user_playlist_create(
+            name=name,
+            public=False,
+            description=description,
+        ),
+        operation_name="Spotify create playlist",
+        retryable_status_codes={429},
+        retry_network_errors=False,
     )
 
     return {
@@ -170,9 +319,14 @@ def add_tracks_to_playlist(
             "Spotify accepts at most 100 playlist items per request"
         )
 
-    response = spotify.playlist_add_items(
-        playlist_id,
-        track_uris,
+    response = _run_spotify_operation(
+        lambda: spotify.playlist_add_items(
+            playlist_id,
+            track_uris,
+        ),
+        operation_name="Spotify add playlist tracks",
+        retryable_status_codes={429},
+        retry_network_errors=False,
     )
 
     return response["snapshot_id"]
@@ -190,9 +344,14 @@ def find_owned_playlist_by_name(
     offset = 0
 
     while True:
-        response = spotify.current_user_playlists(
-            limit=50,
-            offset=offset,
+        response = _run_spotify_operation(
+            lambda: spotify.current_user_playlists(
+                limit=50,
+                offset=offset,
+            ),
+            operation_name=(
+                f"Spotify list playlists at offset {offset}"
+            ),
         )
 
         for playlist in response.get("items", []):
@@ -234,9 +393,12 @@ def replace_playlist_tracks(
             "Spotify accepts at most 100 playlist items per request"
         )
 
-    response = spotify.playlist_replace_items(
-        playlist_id,
-        track_uris,
+    response = _run_spotify_operation(
+        lambda: spotify.playlist_replace_items(
+            playlist_id,
+            track_uris,
+        ),
+        operation_name="Spotify replace playlist tracks",
     )
 
     return response["snapshot_id"]
