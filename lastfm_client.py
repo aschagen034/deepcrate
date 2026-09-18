@@ -2,14 +2,84 @@ import os
 
 import requests
 from dotenv import load_dotenv
+from retry import run_with_retries
 
 LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
+LASTFM_RETRYABLE_ERROR_CODES = {11, 16, 29}
+
+
+class LastfmTemporaryError(RuntimeError):
+    """Represent a temporary Last.fm failure that may succeed later."""
+
+
+def _request_lastfm(
+    params: dict,
+) -> dict:
+    """Send a Last.fm request with retries for temporary failures."""
+
+    def send_request() -> dict:
+        response = requests.get(
+            LASTFM_API_URL,
+            params=params,
+            timeout=10,
+        )
+
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as error:
+            status_code = response.status_code
+
+            if status_code == 429 or status_code >= 500:
+                raise LastfmTemporaryError(
+                    f"Last.fm returned HTTP {status_code}"
+                ) from error
+
+            raise
+
+        data = response.json()
+
+        if "error" not in data:
+            return data
+
+        try:
+            error_code = int(data["error"])
+        except (TypeError, ValueError):
+            error_code = 0
+
+        message = data.get(
+            "message",
+            "Last.fm API request failed",
+        )
+
+        if error_code in LASTFM_RETRYABLE_ERROR_CODES:
+            raise LastfmTemporaryError(
+                f"Last.fm error {error_code}: {message}"
+            )
+
+        raise RuntimeError(
+            f"Last.fm error {error_code}: {message}"
+        )
+
+    return run_with_retries(
+        send_request,
+        retryable_exceptions=(
+            requests.Timeout,
+            requests.ConnectionError,
+            LastfmTemporaryError,
+        ),
+        operation_name=(
+            f"Last.fm {params.get('method', 'request')}"
+        ),
+        max_attempts=3,
+        base_delay=1.0,
+        max_delay=10.0,
+    )
 
 
 def get_artist_tags(artist_name: str, limit: int = 10) -> list[str]:
     """Fetch an artist's top Last.fm tags.
     
-    Return names stripped of sourrounding whitespace and converted to lowercase,
+    Return names stripped of surrounding whitespace and converted to lowercase,
     skipping missing or empty names among the first limit tags.
     """
 
@@ -20,24 +90,15 @@ def get_artist_tags(artist_name: str, limit: int = 10) -> list[str]:
     if not api_key:
         raise ValueError("LASTFM_API_KEY is missing from .env")
 
-    response = requests.get(
-        LASTFM_API_URL,
-        params={
+    data = _request_lastfm(
+        {
             "method": "artist.gettoptags",
             "artist": artist_name,
             "api_key": api_key,
             "format": "json",
             "autocorrect": 1,
-        },
-        timeout=10,
+        }
     )
-    response.raise_for_status()
-
-    data = response.json()
-
-    # Check for API errors in the response body after checking the HTTP status.
-    if "error" in data:
-        raise RuntimeError(data.get("message", "Last.fm API request failed"))
 
     tags = data.get("toptags", {}).get("tag", [])
 
@@ -65,25 +126,16 @@ def get_similar_artists(
     if not api_key:
         raise ValueError("LASTFM_API_KEY is missing from .env")
 
-    response = requests.get(
-        LASTFM_API_URL,
-        params={
+    data = _request_lastfm(
+        {
             "method": "artist.getsimilar",
             "artist": artist_name,
             "api_key": api_key,
             "format": "json",
             "autocorrect": 1,
             "limit": limit,
-        },
-        timeout=10,
+        }
     )
-    response.raise_for_status()
-
-    data = response.json()
-
-    # Check for API errors in the response body after checking the HTTP status.
-    if "error" in data:
-        raise RuntimeError(data.get("message", "Last.fm API request failed"))
 
     similar_artists = data.get(
         "similarartists",
@@ -116,25 +168,17 @@ def get_artist_top_tracks(
     if not api_key:
         raise ValueError("LASTFM_API_KEY is missing from .env")
 
-    response = requests.get(
-        LASTFM_API_URL,
-        params={
+    data = _request_lastfm(
+        {
             "method": "artist.gettoptracks",
             "artist": artist_name,
             "api_key": api_key,
             "format": "json",
             "autocorrect": 1,
             "limit": limit,
-        },
-        timeout=10,
+        }
     )
-    response.raise_for_status()
 
-    data = response.json()
-
-    # Check for API errors in the response body after checking the HTTP status.
-    if "error" in data:
-        raise RuntimeError(data.get("message", "Last.fm API request failed"))
     tracks = data.get(
         "toptracks",
         {},
