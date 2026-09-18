@@ -15,7 +15,7 @@ When weekly scheduling is configured, the playlist updates automatically and cha
 - Selects up to three related artists as recommendation seeds
 - Discovers tracks from seed and related artists
 - Ranks candidates by artist similarity
-- Limits tracks per artists for better variety
+- Limits tracks per artist for better variety
 - Interleaves artists instead of grouping their tracks together
 - Adds controlled ranking variation between runs
 - Tracks previously selected songs using Spotify track IDs
@@ -25,6 +25,8 @@ When weekly scheduling is configured, the playlist updates automatically and cha
 - Writes persistent runtime logs
 - Includes a PowerShell runner for Windows Task Scheduler
 - Includes automated tests with pytest
+- Retries temporary Spotify and Last.fm failures with exponential backoff
+- Respects Spotify 'Retry-After' responses while avoiding retures that could create duplicate writes
 
 ## How It Works
 
@@ -67,15 +69,18 @@ deepcrate/
 ├── playlist_generator.py
 ├── history.py
 ├── logging_config.py
+├── retry.py
 ├── run_deepcrate.ps1
 ├── requirements.txt
 ├── README.md
 └── tests/
     ├── test_history.py
+    ├── test_lastfm_client.py
     ├── test_logging_config.py
     ├── test_main.py
     ├── test_playlist_generator.py
     ├── test_recommender.py
+    ├── test_retry.py
     └── test_spotify_client.py
 ```
 
@@ -283,6 +288,21 @@ View recent log entries with:
 Get-Content logs\deepcrate.log -Tail 30
 ```
 
+Temporary API failures and retry delays are written to the runtime log. If all retry attempts are exhausted, DeepCrate records the final error and exits with a nonzero status so Windows Task Scheduler can retry the complete run.
+
+## API Retry Behavior
+
+DeepCrate attempts temporary API operations up to three times.
+
+- Last.fm requests use exponential backoff for network failures, rate limits, temporary server errors, and retryable Last.fm error codes.
+- Spotify requests honor the `Retry-After` header for ordinary rate limits.
+- Permanent request errors are not retried.
+- Spotify quota exhaustion is left to Windows Task Scheduler to retry later.
+- Playlist creation and track-appending operations avoid retries after ambiguous network or server failures, preventing duplicate playlists or tracks.
+- Replacing a playlist's complete contents can be retried safely because repeating the operation produces the same final state.
+
+If all attempts are exhausted, DeepCrate logs the final error and exits with a nonzero status.
+
 ## PowerShell Runner
 
 The repository includes `run_deepcrate.ps1`.
@@ -428,7 +448,7 @@ These settings are currently defined in the Python source and can be moved into 
 - Spotify searches may return remasters, radio edits, alternate editions, or duplicate recordings.
 - A completely fresh 50-track playlist is not guaranteed if the candidate pool is limited.
 - Repeated runs with similar top artists may produce many recent fallback tracks.
-- Spotify and Last.fm rate limits can temporarily prevent a run from completing.
+- Prolonged Spotify or Last.fm outages, rate limits, or quota exhaustion may still prevent a run from completing after all retries are exhausted.
 - The Windows scheduled task only runs while the configured user is signed in.
 
 ## Future Improvements
@@ -436,7 +456,6 @@ These settings are currently defined in the Python source and can be moved into 
 Potential future milestones include:
 
 - Smarter duplicate detection for remasters, radio edits, and alternate releases
-- More resilient API handling with retries for rate limits and temporary network failures
 - Configurable playlist size, cooldown period, artist limits, and Spotify listening range
 - Improved history retention and cleanup
 - More flexible seed selection from larger groups of highly similar artists
