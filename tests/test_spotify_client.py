@@ -493,8 +493,57 @@ def test_get_top_artists_uses_retry_wrapper(
         },
     ]
     assert captured_operation_names == [
-        "Spotify get top artists",
+        "Spotify get top artists for short_term",
     ]
+
+
+@pytest.mark.parametrize(
+    "time_range",
+    [
+        "short_term",
+        "medium_term",
+        "long_term",
+    ],
+)
+def test_get_top_artists_accepts_spotify_time_ranges(
+    monkeypatch,
+    time_range,
+):
+    spotify = FakeTopArtistsSpotify()
+
+    monkeypatch.setattr(
+        spotify_client,
+        "_run_spotify_operation",
+        lambda operation, operation_name: operation(),
+    )
+
+    get_top_artists(
+        spotify,
+        limit=10,
+        time_range=time_range,
+    )
+
+    assert spotify.calls == [
+        {
+            "limit": 10,
+            "time_range": time_range,
+        },
+    ]
+
+
+def test_get_top_artists_rejects_invalid_time_range():
+    spotify = FakeTopArtistsSpotify()
+
+    with pytest.raises(
+        ValueError,
+        match="Time range must be",
+    ):
+        get_top_artists(
+            spotify,
+            time_range="weekly",
+        )
+
+    assert spotify.calls == []
 
 
 def test_search_artist_tracks_uses_retry_wrapper(

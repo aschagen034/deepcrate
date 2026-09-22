@@ -149,15 +149,34 @@ def get_current_user(
     )
 
 
-def get_top_artists(spotify, limit: int = 10) -> list[dict]:
-    """Return the user's top artists over Spotify's short-term time range."""
+def get_top_artists(
+    spotify,
+    limit: int = 10,
+    time_range: str = "short_term",
+) -> list[dict]:
+    """Return the user's top artists for a Spotify time range."""
+    valid_time_ranges = {
+        "short_term",
+        "medium_term",
+        "long_term",
+    }
+
+    if time_range not in valid_time_ranges:
+        raise ValueError(
+            "Time range must be short_term,"
+            "medium_term, or long_term"
+        )
+
     response = _run_spotify_operation(
         lambda: spotify.current_user_top_artists(
             limit=limit,
-            time_range="short_term",
+            time_range=time_range,
         ),
-        operation_name="Spotify get top artists",
+        operation_name=(
+            f"Spotify get top artists for {time_range}"
+        ),
     )
+
     return response["items"]
 
 
