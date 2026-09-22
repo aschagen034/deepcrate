@@ -76,7 +76,7 @@ def add_ranking_variety(
 
 def build_playlist(
     ranked_tracks: list[dict],
-    target_size: int = 50,
+    target_size: int = 30,
     max_tracks_per_artist: int = 5,
 ) -> list[dict]:
     """Select unique tracks in input order, enforce an artist cap, and interleave them.

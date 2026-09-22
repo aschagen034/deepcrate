@@ -31,6 +31,62 @@ def calculate_tag_similarity(
     return len(shared_tags) / len(all_tags)
 
 
+def calculate_target_genre_affinity(
+        artist_tags: list[str],
+        target_tags: list[str],
+) -> float:
+    """Return how strongly an artist's tags match a target genre profile.
+
+    The score is the proportion of the artist's unique normalized tags
+    that appear in the target tags. A score of 1.0 means every artist tag
+    belongs to the target profile.
+    """
+    normalized_artist_tags = {
+        tag.strip().lower()
+        for tag in artist_tags
+        if tag.strip()
+    }
+    normalized_target_tags = {
+        tag.strip().lower()
+        for tag in target_tags
+        if tag.strip()
+    }
+
+    if not normalized_artist_tags:
+        return 0.0
+
+    matching_tags = (
+        normalized_artist_tags
+        & normalized_target_tags
+    )
+
+    return (
+        len(matching_tags)
+        / len(normalized_artist_tags)
+    )
+
+
+def filter_artists_by_genre_affinity(
+    artist_tags: dict[str, list[str]],
+    target_tags: list[str],
+    minimum_affinity: float = 0.15,
+) -> dict[str, list[str]]:
+    """Return artists that meet a target genre-affinity threshold."""
+    if minimum_affinity < 0 or minimum_affinity > 1:
+        raise ValueError(
+            "Minimum affinity must be between 0 and 1"
+        )
+
+    return {
+        artist_name: tags
+        for artist_name, tags in artist_tags.items()
+        if calculate_target_genre_affinity(
+            tags,
+            target_tags,
+        ) >= minimum_affinity
+    }
+
+
 def find_strongest_artist_pair(
     artist_tags: dict[str, list[str]],
 ) -> tuple[str, str]:

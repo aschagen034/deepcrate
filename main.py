@@ -6,6 +6,8 @@ from lastfm_client import (
     get_similar_artists,
 )
 from recommender import (
+    calculate_target_genre_affinity,
+    filter_artists_by_genre_affinity,
     find_strongest_artist_pair,
     find_third_artist,
     merge_similar_artists,
@@ -36,6 +38,20 @@ from history import (
 from logging_config import configure_logging
 
 logger = logging.getLogger("deepcrate")
+
+TARGET_GENRE_TAGS = [
+    "deep house",
+    "minimal house",
+    "microhouse",
+    "rominimal",
+    "tech house",
+    "deep tech",
+    "minimal",
+    "house",
+]
+
+MINIMUM_GENRE_AFFINITY = 0.15
+PLAYLIST_SIZE = 30
 
 def parse_args(
         arguments: list[str] | None = None,
@@ -93,12 +109,55 @@ def main(
         else:
             print(f"{artist_name}: no tags found")
 
-    if len(artist_tags) < 2:
-        print("\nNot enough tagged artists to create a cluster.")
+    artist_genre_affinities = {
+        artist_name: calculate_target_genre_affinity(
+            tags,
+            TARGET_GENRE_TAGS,
+        )
+        for artist_name, tags in artist_tags.items()
+    }
+
+    print("\nTarget genre affinity:")
+
+    for artist_name, affinity in sorted(
+        artist_genre_affinities.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    ):
+        print(
+            f"{artist_name}: "
+            f"{affinity:.2f}"
+        )
+
+    genre_artist_tags = filter_artists_by_genre_affinity(
+        artist_tags,
+        TARGET_GENRE_TAGS,
+        minimum_affinity=MINIMUM_GENRE_AFFINITY,
+    )
+
+    print("\nGenre-compatible top artists:")
+
+    for artist_name in genre_artist_tags:
+        print(artist_name)
+
+    if len(genre_artist_tags) < 2:
+        logger.warning(
+            "Only %d genre-compatible top artists were found",
+            len(genre_artist_tags),
+        )
+        print(
+            "\nNot enough genre-compatible top artists "
+            "to create a seed cluster."
+        )
         return
 
-    strongest_pair = find_strongest_artist_pair(artist_tags)
-    third_artist = find_third_artist(artist_tags, strongest_pair)
+    strongest_pair = find_strongest_artist_pair(
+        genre_artist_tags
+    )
+    third_artist = find_third_artist(
+        genre_artist_tags,
+        strongest_pair,
+    )
 
     seed_artists = list(strongest_pair)
 
@@ -283,12 +342,12 @@ def main(
         varied_candidates,
         track_history,
         cooldown_days=28,
-        target_size=50,
+        target_size=PLAYLIST_SIZE,
     )
 
     final_tracks = build_playlist(
         history_filtered_candidates,
-        target_size=50,
+        target_size=PLAYLIST_SIZE,
         max_tracks_per_artist=5,
     )
 

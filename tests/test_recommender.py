@@ -2,6 +2,8 @@ import pytest
 
 from recommender import (
     calculate_tag_similarity,
+    calculate_target_genre_affinity,
+    filter_artists_by_genre_affinity,
     find_strongest_artist_pair,
     find_third_artist,
     merge_similar_artists,
@@ -250,3 +252,181 @@ def test_rank_candidates_does_not_change_original_tracks():
     rank_candidates(candidate_tracks)
 
     assert "recommendation_score" not in candidate_tracks[0]
+
+
+def test_target_genre_affinity_full_match():
+    artist_tags = [
+        "deep house",
+        "minimal house",
+        "house",
+    ]
+    target_tags = [
+        "deep house",
+        "minimal house",
+        "microhouse",
+        "rominimal",
+        "tech house",
+        "house",
+    ]
+
+    result = calculate_target_genre_affinity(
+        artist_tags,
+        target_tags,
+    )
+
+    assert result == 1.0
+
+
+def test_target_genre_affinity_partial_match():
+    artist_tags = [
+        "deep house",
+        "house",
+        "electronic",
+        "uk",
+    ]
+    target_tags = [
+        "deep house",
+        "minimal house",
+        "microhouse",
+        "rominimal",
+        "tech house",
+        "house",
+    ]
+
+    result = calculate_target_genre_affinity(
+        artist_tags,
+        target_tags,
+    )
+
+    assert result == 0.5
+
+
+def test_target_genre_affinity_no_match():
+    result = calculate_target_genre_affinity(
+        ["reggae", "dub", "ska"],
+        ["deep house", "minimal house", "tech house"],
+    )
+
+    assert result == 0.0
+
+
+def test_target_genre_affinity_normalizes_tags():
+    result = calculate_target_genre_affinity(
+        [
+            " Deep House ",
+            "HOUSE",
+            "deep house",
+        ],
+        [
+            "deep house",
+            "house",
+        ],
+    )
+
+    assert result == 1.0
+
+
+def test_target_genre_affinity_empty_artist_tags():
+    result = calculate_target_genre_affinity(
+        [],
+        ["deep house", "minimal house", "tech house"],
+    )
+
+    assert result == 0.0
+
+
+def test_target_genre_affinity_empty_target_tags():
+    result = calculate_target_genre_affinity(
+        ["deep house", "house"],
+        [],
+    )
+
+    assert result == 0.0
+
+
+def test_filter_artists_by_genre_affinity():
+    artist_tags = {
+        "Janeret": [
+            "deep house",
+            "minimal house",
+            "microhouse",
+            "electronic",
+        ],
+        "Demuja": [
+            "house",
+            "deep house",
+            "electronic",
+            "austria",
+        ],
+        "The Beatles": [
+            "rock",
+            "classic rock",
+            "british",
+            "pop",
+        ],
+    }
+    target_tags = [
+        "deep house",
+        "minimal house",
+        "microhouse",
+        "tech house",
+        "house",
+    ]
+
+    result = filter_artists_by_genre_affinity(
+        artist_tags,
+        target_tags,
+        minimum_affinity=0.15,
+    )
+
+    assert result == {
+        "Janeret": [
+            "deep house",
+            "minimal house",
+            "microhouse",
+            "electronic",
+        ],
+        "Demuja": [
+            "house",
+            "deep house",
+            "electronic",
+            "austria",
+        ],
+    }
+
+
+def test_filter_artists_includes_threshold_boundary():
+    artist_tags = {
+        "Test Artist": [
+            "deep house",
+            "electronic",
+            "dance",
+            "uk",
+        ],
+    }
+
+    result = filter_artists_by_genre_affinity(
+        artist_tags,
+        ["deep house", "tech house"],
+        minimum_affinity=0.25,
+    )
+
+    assert "Test Artist" in result
+
+
+@pytest.mark.parametrize(
+    "minimum_affinity",
+    [-0.1, 1.1],
+)
+def test_filter_artists_rejects_invalid_affinity(
+    minimum_affinity,
+):
+    with pytest.raises(
+        ValueError,
+        match="between 0 and 1",
+    ):
+        filter_artists_by_genre_affinity(
+            {},
+            ["deep house"],
+            minimum_affinity=minimum_affinity,
+        )
