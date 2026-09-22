@@ -4,6 +4,7 @@ from recommender import (
     calculate_tag_similarity,
     calculate_target_genre_affinity,
     filter_artists_by_genre_affinity,
+    filter_similar_artists_by_genre_affinity,
     find_strongest_artist_pair,
     find_third_artist,
     merge_similar_artists,
@@ -426,6 +427,137 @@ def test_filter_artists_rejects_invalid_affinity(
         match="between 0 and 1",
     ):
         filter_artists_by_genre_affinity(
+            {},
+            ["deep house"],
+            minimum_affinity=minimum_affinity,
+        )
+
+
+def test_filter_similar_artists_by_genre_affinity():
+    similar_artists = [
+        {
+            "name": "Janeret",
+            "recommended_by": ["Demuja"],
+            "similarities": {
+                "Demuja": 0.8,
+            },
+        },
+        {
+            "name": "Rock Artist",
+            "recommended_by": ["Demuja"],
+            "similarities": {
+                "Demuja": 0.6,
+            },
+        },
+    ]
+    artist_tags = {
+        "Janeret": [
+            "deep house",
+            "microhouse",
+            "electronic",
+        ],
+        "Rock Artist": [
+            "rock",
+            "classic rock",
+        ],
+    }
+
+    result = filter_similar_artists_by_genre_affinity(
+        similar_artists,
+        artist_tags,
+        [
+            "deep house",
+            "minimal house",
+            "microhouse",
+            "tech house",
+            "house",
+        ],
+        minimum_affinity=0.15,
+    )
+
+    assert result == [
+        {
+            "name": "Janeret",
+            "recommended_by": ["Demuja"],
+            "similarities": {
+                "Demuja": 0.8,
+            },
+            "tags": [
+                "deep house",
+                "microhouse",
+                "electronic",
+            ],
+            "genre_affinity": pytest.approx(2 / 3),
+        },
+    ]
+
+
+def test_filter_similar_artists_matches_names_case_insensitively():
+    similar_artists = [
+        {
+            "name": "JANERET",
+            "recommended_by": ["Demuja"],
+            "similarities": {
+                "Demuja": 0.8,
+            },
+        },
+    ]
+    artist_tags = {
+        "Janeret": [
+            "deep house",
+            "electronic",
+        ],
+    }
+
+    result = filter_similar_artists_by_genre_affinity(
+        similar_artists,
+        artist_tags,
+        ["deep house"],
+        minimum_affinity=0.5,
+    )
+
+    assert len(result) == 1
+    assert result[0]["genre_affinity"] == 0.5
+
+
+def test_filter_similar_artists_does_not_modify_original():
+    similar_artists = [
+        {
+            "name": "Janeret",
+            "recommended_by": ["Demuja"],
+            "similarities": {
+                "Demuja": 0.8,
+            },
+        },
+    ]
+
+    filter_similar_artists_by_genre_affinity(
+        similar_artists,
+        {
+            "Janeret": [
+                "deep house",
+            ],
+        },
+        ["deep house"],
+    )
+
+    assert "tags" not in similar_artists[0]
+    assert "genre_affinity" not in similar_artists[0]
+
+
+@pytest.mark.parametrize(
+    "minimum_affinity",
+    [-0.1, 1.1],
+)
+def test_filter_similar_artists_rejects_invalid_affinity(
+    minimum_affinity,
+):
+    with pytest.raises(
+        ValueError,
+        match="between 0 and 1",
+    ):
+        filter_similar_artists_by_genre_affinity(
+            [],
             {},
             ["deep house"],
             minimum_affinity=minimum_affinity,

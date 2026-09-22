@@ -87,6 +87,51 @@ def filter_artists_by_genre_affinity(
     }
 
 
+def filter_similar_artists_by_genre_affinity(
+    similar_artists: list[dict],
+    artist_tags: dict[str, list[str]],
+    target_tags: list[str],
+    minimum_affinity: float = 0.15,
+) -> list[dict]:
+    """Filter similar artists using a target genre profile.
+
+    Returned artists are copied and enriched with their normalized genre
+    affinity and Last.fm tags. Original candidate dictionaries are not
+    modified.
+    """
+    if minimum_affinity < 0 or minimum_affinity > 1:
+        raise ValueError(
+            "Minimum affinity must be between 0 and 1"
+        )
+
+    tags_by_artist = {
+        artist_name.casefold(): tags
+        for artist_name, tags in artist_tags.items()
+    }
+
+    filtered_artists = []
+
+    for artist in similar_artists:
+        tags = tags_by_artist.get(
+            artist["name"].casefold(),
+            [],
+        )
+        affinity = calculate_target_genre_affinity(
+            tags,
+            target_tags,
+        )
+
+        if affinity < minimum_affinity:
+            continue
+
+        filtered_artist = artist.copy()
+        filtered_artist["tags"] = tags.copy()
+        filtered_artist["genre_affinity"] = affinity
+        filtered_artists.append(filtered_artist)
+
+    return filtered_artists
+
+
 def find_strongest_artist_pair(
     artist_tags: dict[str, list[str]],
 ) -> tuple[str, str]:

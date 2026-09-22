@@ -8,6 +8,7 @@ from lastfm_client import (
 from recommender import (
     calculate_target_genre_affinity,
     filter_artists_by_genre_affinity,
+    filter_similar_artists_by_genre_affinity,
     find_strongest_artist_pair,
     find_third_artist,
     merge_similar_artists,
@@ -18,10 +19,10 @@ from spotify_client import (
     authenticate,
     create_playlist,
     find_owned_playlist_by_name,
+    get_current_user,
     get_top_artists,
     replace_playlist_tracks,
     search_artist_tracks,
-    get_current_user,
 )
 from playlist_generator import (
     add_ranking_variety,
@@ -51,7 +52,9 @@ TARGET_GENRE_TAGS = [
 ]
 
 MINIMUM_GENRE_AFFINITY = 0.15
+RELATED_ARTIST_GENRE_POOL_PER_SEED = 10
 PLAYLIST_SIZE = 30
+
 
 def parse_args(
         arguments: list[str] | None = None,
@@ -181,7 +184,59 @@ def main(
         recommendations_by_seed,
     )
 
-    print(f"\nSimilar artist candidates ({len(candidate_artists)}):")
+    candidate_keys_to_check = {
+        related_artist["name"].casefold()
+        for seed_artist in seed_artists
+        for related_artist in (
+            recommendations_by_seed[seed_artist][
+                :RELATED_ARTIST_GENRE_POOL_PER_SEED
+            ]
+        )
+    }
+
+    candidate_artist_tags = {}
+
+    print("\nRelated artist genre analysis:")
+
+    for candidate in candidate_artists:
+        artist_key = candidate["name"].casefold()
+
+        if artist_key not in candidate_keys_to_check:
+            continue
+
+        tags = get_artist_tags(candidate["name"])
+        candidate_artist_tags[candidate["name"]] = tags
+
+        affinity = calculate_target_genre_affinity(
+            tags,
+            TARGET_GENRE_TAGS,
+        )
+
+        print(
+            f"{candidate['name']}: "
+            f"{affinity:.2f}"
+        )
+
+    candidate_artists = (
+        filter_similar_artists_by_genre_affinity(
+            candidate_artists,
+            candidate_artist_tags,
+            TARGET_GENRE_TAGS,
+            minimum_affinity=MINIMUM_GENRE_AFFINITY,
+        )
+    )
+
+    logger.info(
+        "Selected %d genre-compatible related artists "
+        "from %d checked candidates",
+        len(candidate_artists),
+        len(candidate_artist_tags),
+    )
+
+    print(
+        f"\nGenre-compatible similar artist candidates "
+        f"({len(candidate_artists)}):"
+    )
 
     for candidate in candidate_artists:
         relationships = ", ".join(
@@ -192,7 +247,12 @@ def main(
             for seed_name in candidate["recommended_by"]
         )
 
-        print(f"{candidate['name']} - recommended by: {relationships}")
+        print(
+            f"{candidate['name']} - "
+            f"genre affinity: "
+            f"{candidate['genre_affinity']:.2f} - "
+            f"recommended by: {relationships}"
+        )
 
     seed_track_candidates = []
 
@@ -285,6 +345,9 @@ def main(
             candidate_track = spotify_track.copy()
             candidate_track["source"] = "similar_artist"
             candidate_track["source_artist"] = related_artist_name
+            candidate_track["genre_affinity"] = (
+                related_artist["genre_affinity"]
+            )
             candidate_track["recommended_by"] = (
                 related_artist["recommended_by"].copy()
             )
