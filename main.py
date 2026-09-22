@@ -40,6 +40,12 @@ from logging_config import configure_logging
 
 logger = logging.getLogger("deepcrate")
 
+TOP_ARTIST_TIME_RANGES = (
+    "short_term",
+    "medium_term",
+    "long_term",
+)
+
 TARGET_GENRE_TAGS = [
     "deep house",
     "minimal house",
@@ -51,6 +57,7 @@ TARGET_GENRE_TAGS = [
     "house",
 ]
 
+MINIMUM_SEED_ARTISTS = 2
 MINIMUM_GENRE_AFFINITY = 0.15
 RELATED_ARTIST_GENRE_POOL_PER_SEED = 10
 PLAYLIST_SIZE = 30
@@ -89,61 +96,96 @@ def main(
     if current_user is None:
         raise RuntimeError("Spotify did not return a current user profile")
 
-    top_artists = get_top_artists(spotify)
-
     print(f"Connected to Spotify as: {current_user['display_name']}")
 
-    print("\nTop artists:")
-
-    for position, artist in enumerate(top_artists, start=1):
-        print(f"{position}. {artist['name']}")
-
     artist_tags = {}
+    artist_time_ranges = {}
+    seen_artist_keys = set()
+    genre_artist_tags = {}
 
-    print("\nLast.fm tags:")
-
-    for artist in top_artists:
-        artist_name = artist["name"]
-        tags = get_artist_tags(artist_name)
-
-        if tags:
-            artist_tags[artist_name] = tags
-            print(f"{artist_name}: {', '.join(tags)}")
-        else:
-            print(f"{artist_name}: no tags found")
-
-    artist_genre_affinities = {
-        artist_name: calculate_target_genre_affinity(
-            tags,
-            TARGET_GENRE_TAGS,
+    for time_range in TOP_ARTIST_TIME_RANGES:
+        top_artists = get_top_artists(
+            spotify,
+            limit=10,
+            time_range=time_range,
         )
-        for artist_name, tags in artist_tags.items()
-    }
 
-    print("\nTarget genre affinity:")
+        print(f"\nTop artists ({time_range}):")
 
-    for artist_name, affinity in sorted(
-        artist_genre_affinities.items(),
-        key=lambda item: item[1],
-        reverse=True,
-    ):
+        for position, artist in enumerate(
+            top_artists,
+            start=1,
+        ):
+            print(f"{position}. {artist['name']}")
+
         print(
-            f"{artist_name}: "
-            f"{affinity:.2f}"
+            f"\nNew artist Last.fm tag and genre analysis "
+            f"({time_range}):"
         )
 
-    genre_artist_tags = filter_artists_by_genre_affinity(
-        artist_tags,
-        TARGET_GENRE_TAGS,
-        minimum_affinity=MINIMUM_GENRE_AFFINITY,
-    )
+        for artist in top_artists:
+            artist_name = artist["name"]
+            artist_key = artist_name.casefold()
+
+            if artist_key in seen_artist_keys:
+                continue
+
+            seen_artist_keys.add(artist_key)
+            artist_time_ranges[artist_name] = time_range
+
+            tags = get_artist_tags(artist_name)
+
+            if not tags:
+                print(
+                    f"{artist_name}: "
+                    f"no tags found"
+                )
+                continue
+
+            artist_tags[artist_name] = tags
+
+            affinity = calculate_target_genre_affinity(
+                tags,
+                TARGET_GENRE_TAGS,
+            )
+
+            print(
+                f"{artist_name}: "
+                f"{affinity:.2f} - "
+                f"{', '.join(tags)}"
+            )
+
+        genre_artist_tags = (
+            filter_artists_by_genre_affinity(
+                artist_tags,
+                TARGET_GENRE_TAGS,
+                minimum_affinity=(
+                    MINIMUM_GENRE_AFFINITY
+                ),
+            )
+        )
+
+        if (
+            len(genre_artist_tags)
+            >= MINIMUM_SEED_ARTISTS
+        ):
+            logger.info(
+                "Found %d genre-compatible top artists "
+                "after checking %s",
+                len(genre_artist_tags),
+                time_range,
+            )
+            break
 
     print("\nGenre-compatible top artists:")
 
     for artist_name in genre_artist_tags:
-        print(artist_name)
+        print(
+            f"{artist_name} "
+            f"({artist_time_ranges[artist_name]})"
+        )
 
-    if len(genre_artist_tags) < 2:
+    if len(genre_artist_tags) < MINIMUM_SEED_ARTISTS:
         logger.warning(
             "Only %d genre-compatible top artists were found",
             len(genre_artist_tags),
