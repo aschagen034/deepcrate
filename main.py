@@ -46,16 +46,17 @@ TOP_ARTIST_TIME_RANGES = (
     "long_term",
 )
 
-TARGET_GENRE_TAGS = [
-    "deep house",
-    "minimal house",
-    "microhouse",
-    "rominimal",
-    "tech house",
-    "deep tech",
-    "minimal",
-    "house",
-]
+TARGET_GENRE_WEIGHTS = {
+    "house": 0.5,
+    "electronic": 0.2,
+    "tech house": 1.0,
+    "deep house": 1.2,
+    "minimal": 1.0,
+    "minimal house": 1.5,
+    "deep tech": 1.5,
+    "microhouse": 2.0,
+    "rominimal": 2.0,
+}
 
 MINIMUM_SEED_ARTISTS = 2
 MINIMUM_GENRE_AFFINITY = 0.15
@@ -146,7 +147,7 @@ def main(
 
             affinity = calculate_target_genre_affinity(
                 tags,
-                TARGET_GENRE_TAGS,
+                TARGET_GENRE_WEIGHTS,
             )
 
             print(
@@ -158,7 +159,7 @@ def main(
         genre_artist_tags = (
             filter_artists_by_genre_affinity(
                 artist_tags,
-                TARGET_GENRE_TAGS,
+                TARGET_GENRE_WEIGHTS,
                 minimum_affinity=(
                     MINIMUM_GENRE_AFFINITY
                 ),
@@ -251,7 +252,7 @@ def main(
 
         affinity = calculate_target_genre_affinity(
             tags,
-            TARGET_GENRE_TAGS,
+            TARGET_GENRE_WEIGHTS,
         )
 
         print(
@@ -263,7 +264,7 @@ def main(
         filter_similar_artists_by_genre_affinity(
             candidate_artists,
             candidate_artist_tags,
-            TARGET_GENRE_TAGS,
+            TARGET_GENRE_WEIGHTS,
             minimum_affinity=MINIMUM_GENRE_AFFINITY,
         )
     )

@@ -261,18 +261,15 @@ def test_target_genre_affinity_full_match():
         "minimal house",
         "house",
     ]
-    target_tags = [
-        "deep house",
-        "minimal house",
-        "microhouse",
-        "rominimal",
-        "tech house",
-        "house",
-    ]
+    target_weights = {
+        "deep house": 2.0,
+        "minimal house": 3.0,
+        "house": 1.0,
+    }
 
     result = calculate_target_genre_affinity(
         artist_tags,
-        target_tags,
+        target_weights,
     )
 
     assert result == 1.0
@@ -285,27 +282,28 @@ def test_target_genre_affinity_partial_match():
         "electronic",
         "uk",
     ]
-    target_tags = [
-        "deep house",
-        "minimal house",
-        "microhouse",
-        "rominimal",
-        "tech house",
-        "house",
-    ]
+    target_weights = {
+        "deep house": 2.0,
+        "microhouse": 2.0,
+        "house": 1.0,
+    }
 
     result = calculate_target_genre_affinity(
         artist_tags,
-        target_tags,
+        target_weights,
     )
 
-    assert result == 0.5
+    assert result == pytest.approx(3 / 5)
 
 
 def test_target_genre_affinity_no_match():
     result = calculate_target_genre_affinity(
         ["reggae", "dub", "ska"],
-        ["deep house", "minimal house", "tech house"],
+        {
+            "deep house": 2.0,
+            "minimal house": 3.0,
+            "tech house": 2.0,
+        },
     )
 
     assert result == 0.0
@@ -318,10 +316,10 @@ def test_target_genre_affinity_normalizes_tags():
             "HOUSE",
             "deep house",
         ],
-        [
-            "deep house",
-            "house",
-        ],
+        {
+            "deep house": 2.0,
+            "house": 1.0,
+        },
     )
 
     assert result == 1.0
@@ -330,7 +328,11 @@ def test_target_genre_affinity_normalizes_tags():
 def test_target_genre_affinity_empty_artist_tags():
     result = calculate_target_genre_affinity(
         [],
-        ["deep house", "minimal house", "tech house"],
+        {
+            "deep house": 2.0,
+            "minimal house": 3.0,
+            "tech house": 2.0,
+        },
     )
 
     assert result == 0.0
@@ -339,10 +341,30 @@ def test_target_genre_affinity_empty_artist_tags():
 def test_target_genre_affinity_empty_target_tags():
     result = calculate_target_genre_affinity(
         ["deep house", "house"],
-        [],
+        {},
     )
 
     assert result == 0.0
+
+
+def test_target_genre_affinity_uses_tag_weights():
+    target_weights = {
+        "house": 0.5,
+        "microhouse": 2.0,
+    }
+
+    broad_affinity = calculate_target_genre_affinity(
+        ["house"],
+        target_weights,
+    )
+    specific_affinity = calculate_target_genre_affinity(
+        ["microhouse"],
+        target_weights,
+    )
+
+    assert broad_affinity == pytest.approx(0.2)
+    assert specific_affinity == pytest.approx(0.8)
+    assert specific_affinity > broad_affinity
 
 
 def test_filter_artists_by_genre_affinity():
@@ -366,17 +388,17 @@ def test_filter_artists_by_genre_affinity():
             "pop",
         ],
     }
-    target_tags = [
-        "deep house",
-        "minimal house",
-        "microhouse",
-        "tech house",
-        "house",
-    ]
+    target_weights = {
+        "deep house": 2.0,
+        "minimal house": 3.0,
+        "microhouse": 3.0,
+        "tech house": 2.0,
+        "house": 1.0,
+    }
 
     result = filter_artists_by_genre_affinity(
         artist_tags,
-        target_tags,
+        target_weights,
         minimum_affinity=0.15,
     )
 
@@ -408,7 +430,10 @@ def test_filter_artists_includes_threshold_boundary():
 
     result = filter_artists_by_genre_affinity(
         artist_tags,
-        ["deep house", "tech house"],
+        {
+            "deep house": 1.0,
+            "tech house": 3.0,
+        },
         minimum_affinity=0.25,
     )
 
@@ -428,7 +453,7 @@ def test_filter_artists_rejects_invalid_affinity(
     ):
         filter_artists_by_genre_affinity(
             {},
-            ["deep house"],
+            {"deep house": 1.0},
             minimum_affinity=minimum_affinity,
         )
 
@@ -465,13 +490,13 @@ def test_filter_similar_artists_by_genre_affinity():
     result = filter_similar_artists_by_genre_affinity(
         similar_artists,
         artist_tags,
-        [
-            "deep house",
-            "minimal house",
-            "microhouse",
-            "tech house",
-            "house",
-        ],
+        {
+            "deep house": 2.0,
+            "minimal house": 3.0,
+            "microhouse": 3.0,
+            "tech house": 2.0,
+            "house": 1.0,
+        },
         minimum_affinity=0.15,
     )
 
@@ -487,7 +512,7 @@ def test_filter_similar_artists_by_genre_affinity():
                 "microhouse",
                 "electronic",
             ],
-            "genre_affinity": pytest.approx(2 / 3),
+            "genre_affinity": pytest.approx(5 / 11),
         },
     ]
 
@@ -512,7 +537,10 @@ def test_filter_similar_artists_matches_names_case_insensitively():
     result = filter_similar_artists_by_genre_affinity(
         similar_artists,
         artist_tags,
-        ["deep house"],
+        {
+            "deep house": 1.0,
+            "tech house": 1.0,
+        },
         minimum_affinity=0.5,
     )
 
@@ -538,7 +566,7 @@ def test_filter_similar_artists_does_not_modify_original():
                 "deep house",
             ],
         },
-        ["deep house"],
+        {"deep house": 1.0},
     )
 
     assert "tags" not in similar_artists[0]
@@ -559,6 +587,6 @@ def test_filter_similar_artists_rejects_invalid_affinity(
         filter_similar_artists_by_genre_affinity(
             [],
             {},
-            ["deep house"],
+            {"deep house": 1.0},
             minimum_affinity=minimum_affinity,
         )

@@ -33,42 +33,44 @@ def calculate_tag_similarity(
 
 def calculate_target_genre_affinity(
         artist_tags: list[str],
-        target_tags: list[str],
+        target_weights: dict[str, float],
 ) -> float:
-    """Return how strongly an artist's tags match a target genre profile.
+    """Return an artist's weighted affinity with a target genre profile.
 
-    The score is the proportion of the artist's unique normalized tags
-    that appear in the target tags. A score of 1.0 means every artist tag
-    belongs to the target profile.
+    The score is the combined weight of matching normalized tags divided by
+    the total weight of the target profile.
     """
     normalized_artist_tags = {
         tag.strip().lower()
         for tag in artist_tags
         if tag.strip()
     }
-    normalized_target_tags = {
-        tag.strip().lower()
-        for tag in target_tags
+    normalized_target_weights = {
+        tag.strip().lower(): weight
+        for tag, weight in target_weights.items()
         if tag.strip()
     }
 
-    if not normalized_artist_tags:
+    if not normalized_artist_tags or not normalized_target_weights:
         return 0.0
 
-    matching_tags = (
-        normalized_artist_tags
-        & normalized_target_tags
+    total_target_weight = sum(normalized_target_weights.values())
+
+    if total_target_weight <= 0:
+        return 0.0
+
+    matched_weight = sum(
+        normalized_target_weights[tag]
+        for tag in normalized_artist_tags
+        if tag in normalized_target_weights
     )
 
-    return (
-        len(matching_tags)
-        / len(normalized_artist_tags)
-    )
+    return matched_weight / total_target_weight
 
 
 def filter_artists_by_genre_affinity(
     artist_tags: dict[str, list[str]],
-    target_tags: list[str],
+    target_weights: dict[str, float],
     minimum_affinity: float = 0.15,
 ) -> dict[str, list[str]]:
     """Return artists that meet a target genre-affinity threshold."""
@@ -82,7 +84,7 @@ def filter_artists_by_genre_affinity(
         for artist_name, tags in artist_tags.items()
         if calculate_target_genre_affinity(
             tags,
-            target_tags,
+            target_weights,
         ) >= minimum_affinity
     }
 
@@ -90,7 +92,7 @@ def filter_artists_by_genre_affinity(
 def filter_similar_artists_by_genre_affinity(
     similar_artists: list[dict],
     artist_tags: dict[str, list[str]],
-    target_tags: list[str],
+    target_weights: dict[str, float],
     minimum_affinity: float = 0.15,
 ) -> list[dict]:
     """Filter similar artists using a target genre profile.
@@ -118,7 +120,7 @@ def filter_similar_artists_by_genre_affinity(
         )
         affinity = calculate_target_genre_affinity(
             tags,
-            target_tags,
+            target_weights,
         )
 
         if affinity < minimum_affinity:
