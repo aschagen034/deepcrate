@@ -220,6 +220,8 @@ __marimo__/
 # DeepCrate local playlist history
 .deepcrate_history.json
 .deepcrate_history.json.tmp
+.deepcrate_artist_history.json
+.deepcrate_artist_history.json.tmp
 
 # DeepCrate runtime logs
 logs/

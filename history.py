@@ -176,3 +176,116 @@ def was_track_used_recently(
 
     # A timestamp exactly at the cutoff still counts as recent.
     return last_used >= cutoff
+
+
+def was_related_artist_used_recently(
+    artist_name: str,
+    history: dict[str, datetime],
+    cooldown_days: int = 42,
+    now: datetime | None = None,
+) -> bool:
+    """Return whether an artist was used within the cooldown period."""
+    if cooldown_days < 0:
+        raise ValueError("Cooldown days cannot be negative")
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    if now.tzinfo is None:
+        raise ValueError("Current timestamp must include a timezone")
+
+    artist_key = artist_name.strip().casefold()
+    last_used = history.get(artist_key)
+
+    if last_used is None:
+        return False
+
+    cutoff = now - timedelta(days=cooldown_days)
+
+    return last_used >= cutoff
+
+
+def prioritize_related_artists_by_history(
+        artists: list[dict],
+        history: dict[str, datetime],
+        cooldown_days: int = 42,
+        now: datetime | None = None,
+) -> list[dict]:
+    """Place fresh artists before recent artists.
+
+    Preserve the input order of fresh artists. Order recent fallback artists
+    from least recently used to most recently used.
+    """
+    if cooldown_days < 0:
+        raise ValueError("Cooldown days cannot be negative")
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    if now.tzinfo is None:
+        raise ValueError("Current timestamp must include a timezone")
+
+    fresh_artists = []
+    recent_artists = []
+
+    for artist in artists:
+        artist_key = artist["name"].strip().casefold()
+        last_used = history.get(artist_key)
+
+        if was_related_artist_used_recently(
+            artist["name"],
+            history,
+            cooldown_days=cooldown_days,
+            now=now,
+        ):
+            recent_artists.append((last_used, artist))
+        else:
+            fresh_artists.append(artist)
+
+    recent_artists.sort(
+        key=lambda item: item[0],
+    )
+
+    return fresh_artists + [
+        artist
+        for _, artist in recent_artists
+    ]
+
+
+def record_related_artists(
+        history: dict[str, datetime],
+        artists: list[dict],
+        used_at: datetime | None = None,
+) -> dict[str, datetime]:
+    """Return updated history with selected related artists marked as used."""
+    if used_at is None:
+        used_at = datetime.now(timezone.utc)
+
+    if used_at.tzinfo is None:
+        raise ValueError("History timestamp must include a timezone")
+
+    updated_history = history.copy()
+    utc_used_at = used_at.astimezone(timezone.utc)
+
+    for artist in artists:
+        artist_key = artist["name"].strip().casefold()
+
+        if artist_key:
+            updated_history[artist_key] = utc_used_at
+
+    return updated_history
+
+
+def load_artist_history(
+    history_path: str | Path
+) -> dict[str, datetime]:
+    """Load normalized artist usage timestamps from a JSON file."""
+    return load_track_history(history_path)
+
+
+def save_artist_history(
+    history: dict[str, datetime],
+    history_path: str | Path,
+) -> None:
+    """Save normalized artist usage timestamps as JSON."""
+    save_track_history(history, history_path)

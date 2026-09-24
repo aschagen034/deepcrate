@@ -30,8 +30,12 @@ from playlist_generator import (
 )
 from history import (
     filter_recent_tracks,
+    load_artist_history,
     load_track_history,
+    prioritize_related_artists_by_history,
     record_playlist_tracks,
+    record_related_artists,
+    save_artist_history,
     save_track_history,
     was_track_used_recently,
 )
@@ -337,11 +341,16 @@ def main(
         for candidate in candidate_artists
     }
 
+    artist_history_path = ".deepcrate_artist_history.json"
+    artist_history = load_artist_history(
+        artist_history_path,
+    )
+
     selected_related_artists = []
     selected_related_keys = set()
 
     for seed_artist in seed_artists:
-        selected_for_seed = 0
+        compatible_artists_for_seed = []
 
         for related_artist in recommendations_by_seed[seed_artist]:
             artist_key = related_artist["name"].casefold()
@@ -349,15 +358,28 @@ def main(
             if artist_key in seed_name_keys:
                 continue
 
-            if artist_key in selected_related_keys:
-                continue
-
             merged_artist = candidate_lookup.get(artist_key)
 
             if merged_artist is None:
                 continue
 
-            selected_related_artists.append(merged_artist)
+            compatible_artists_for_seed.append(merged_artist)
+
+        prioritized_artists = prioritize_related_artists_by_history(
+            compatible_artists_for_seed,
+            artist_history,
+            cooldown_days=42,
+        )
+
+        selected_for_seed = 0
+
+        for related_artist in prioritized_artists:
+            artist_key = related_artist["name"].casefold()
+
+            if artist_key in selected_related_keys:
+                continue
+
+            selected_related_artists.append(related_artist)
             selected_related_keys.add(artist_key)
             selected_for_seed += 1
 
@@ -490,11 +512,12 @@ def main(
 
     if dry_run:
         print(
-            "\nDry run complete. Spotify playlist and "
-            "track history were not updated."
+            "\nDry run complete. Spotify playlist, track history, "
+            "and artist history were not updated."
         )
         logger.info(
-            "Dry run completed without updating Spotify or history"
+            "Dry run completed without updating Spotify, "
+            "track history, or artist history"
         )
         return
 
@@ -555,6 +578,15 @@ def main(
     save_track_history(
         updated_history,
         history_path,
+    )
+
+    updated_artist_history = record_related_artists(
+        artist_history,
+        selected_related_artists,
+    )
+    save_artist_history(
+        updated_artist_history,
+        artist_history_path,
     )
 
     logger.info(
