@@ -60,7 +60,7 @@ def filter_recent_tracks(
     
     If fewer than target_size tracks qualify, append all recent tracks,
     ordered from least recently used to most recently used.
-    The returned list is not trucnated to target_size.
+    The returned list is not truncated to target_size.
     """
     if cooldown_days < 0:
         raise ValueError("Cooldown days cannot be negative")

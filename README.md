@@ -16,7 +16,7 @@ When weekly scheduling is configured, the playlist updates automatically and cha
 - Retrieves the current user’s recent top artists
 - Fetches artist tags and similar artists from Last.fm
 - Groups top artists using tag similarity
-- Selects up to three related artists as recommendation seeds
+- Selects up to three genre-compatible top artists as recommendation seeds
 - Discovers tracks from seed and related artists
 - Ranks candidates by artist similarity
 - Limits tracks per artist for better variety
@@ -24,6 +24,9 @@ When weekly scheduling is configured, the playlist updates automatically and cha
 - Adds controlled ranking variation between runs
 - Tracks previously selected songs using Spotify track IDs
 - Prioritizes tracks not used within the last 28 days
+- Tracks recently explored related artists using normalized artist names
+- Prioritizes fresh related artists using a 42-day cooldown
+- Reuses the least recently explored artists when fresh options are limited
 - Updates the same Spotify playlist instead of creating duplicates
 - Supports interactive, unattended, and dry-run execution
 - Writes persistent runtime logs
@@ -46,14 +49,15 @@ DeepCrate follows this recommendation pipeline:
 8. Retrieve similar artists for each seed from Last.fm.
 9. Retrieve tags for a limited pool of related artists.
 10. Exclude related artists that do not meet the minimum genre affinity.
-11. Search Spotify for tracks from the accepted seed and related artists.
-12. Score and rank candidate tracks using their recommendation relationships.
-13. Add controlled variation to similarly ranked tracks.
-14. Prioritize tracks that have not appeared within the 28-day cooldown.
-15. Limit each artist to five final tracks.
-16. Interleave artists throughout the playlist.
-17. Create or update the `DeepCrate Weekly` Spotify playlist.
-18. Save selected track IDs and timestamps to local history.
+11. Prioritize related artists that have not been explored within the 42-day artist cooldown.
+12. Search Spotify for tracks from the accepted seed and related artists.
+13. Score and rank candidate tracks using their recommendation relationships.
+14. Add controlled variation to similarly ranked tracks.
+15. Prioritize tracks that have not appeared within the 28-day cooldown.
+16. Limit each artist to five final tracks.
+17. Interleave artists throughout the playlist.
+18. Create or update the `DeepCrate Weekly` Spotify playlist.
+19. Save selected track IDs, related-artist names, and timestamps to local history.
 
 If there are not enough fresh tracks to create a 30-track playlist, DeepCrate uses the oldest recently selected tracks as fallback candidates.
 
@@ -95,6 +99,7 @@ Runtime files are created locally and excluded from Git:
 
 ```text
 .deepcrate_history.json
+.deepcrate_artist_history.json
 logs/deepcrate.log
 ```
 
@@ -201,7 +206,7 @@ DeepCrate generates and prints the proposed playlist, then asks:
 Create or update this playlist in Spotify? [y/N]:
 ```
 
-Enter `y` to update Spotify and save the selected tracks to history.
+Enter `y` to update Spotify and save the selected tracks and related artists to history.
 
 ### Dry-run mode
 
@@ -217,7 +222,7 @@ Dry-run mode:
 - Displays fresh and recently used track counts
 - Writes runtime information to the log
 - Does not update the Spotify playlist
-- Does not update track history
+- Does not update track or related-artist history
 
 ### Unattended mode
 
@@ -225,7 +230,8 @@ Dry-run mode:
 python main.py --yes
 ```
 
-This skips the confirmation prompt, updates Spotify, and records the selected tracks in history. It is intended for scheduled execution.
+This skips the confirmation prompt, updates Spotify, and records the selected tracks and related artists in history. 
+It is intended for scheduled execution.
 
 ### Command help
 
@@ -256,6 +262,20 @@ By default, tracks used during the previous 28 days are considered recent. DeepC
 History is saved only after Spotify successfully creates or updates the playlist. Cancelling an interactive run or using `--dry-run` does not change it.
 
 A malformed or missing history file is safely treated as empty history.
+
+## Related Artist History
+
+DeepCrate stores the most recent usage timestamp for each selected related artist in:
+
+```text
+.deepcrate_artist_history.json
+```
+
+Artist names are normalized so capitalization differences such as NightFunk and Nightfunk are treated as the same artist.
+
+By default, related artists used during the previous 42 days are considered recent. DeepCrate prioritizes fresh genre-compatible artists while keeping the least recently used artists available as fallbacks when the fresh pool is limited.
+
+Artist history is saved only after Spotify successfully creates or updates the playlist. Cancelling an interactive run or using --dry-run does not update it.
 
 ## Freshness Summary
 
@@ -445,6 +465,7 @@ Final playlist size: 30
 Maximum final tracks per artist: 5
 Ranking variation: 15%
 Recent-track cooldown: 28 days
+Related-artist cooldown: 42 days
 Playlist name: DeepCrate Weekly
 Schedule: Friday at 12:00 AM
 ```
@@ -458,6 +479,7 @@ These settings are currently defined in the Python source and can be moved into 
 - Spotify searches may return remasters, radio edits, alternate editions, or duplicate recordings.
 - A completely fresh 30-track playlist is not guaranteed if the genre-compatible candidate pool is limited.
 - Last.fm tags are user-generated, so some relevant underground artists may receive low affinity scores or be excluded.
+- Related-artist rotation depends on the size and quality of the genre-compatible Last.fm recommendation pool.
 - DeepCrate expects the listener to have at least two genre-compatible artists across their short-, medium-, or long-term Spotify listening history.
 - Repeated runs with similar top artists may produce many recent fallback tracks.
 - Prolonged Spotify or Last.fm outages, rate limits, or quota exhaustion may still prevent a run from completing after all retries are exhausted.
