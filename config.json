@@ -1,0 +1,40 @@
+{
+  "playlist": {
+    "name": "DeepCrate Weekly",
+    "size": 30,
+    "max_tracks_per_artist": 5
+  },
+  "spotify": {
+    "top_artists_per_range": 10,
+    "listening_ranges": [
+      "short_term",
+      "medium_term",
+      "long_term"
+    ]
+  },
+  "discovery": {
+    "minimum_seed_artists": 2,
+    "minimum_genre_affinity": 0.15,
+    "lastfm_recommendations_per_seed": 20,
+    "related_artist_genre_pool_per_seed": 10,
+    "related_artists_per_seed": 5,
+    "seed_tracks_per_artist": 10,
+    "related_tracks_per_artist": 10,
+    "ranking_variation": 0.15
+  },
+  "history": {
+    "track_cooldown_days": 28,
+    "related_artist_cooldown_days": 42
+  },
+  "genre_weights": {
+    "house": 0.5,
+    "electronic": 0.2,
+    "tech house": 1.0,
+    "deep house": 1.2,
+    "minimal": 1.0,
+    "minimal house": 1.5,
+    "deep tech": 1.5,
+    "microhouse": 2.0,
+    "rominimal": 2.0
+  }
+}

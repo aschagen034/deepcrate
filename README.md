@@ -31,6 +31,7 @@ When weekly scheduling is configured, the playlist updates automatically and cha
 - Supports interactive, unattended, and dry-run execution
 - Writes persistent runtime logs
 - Includes a PowerShell runner for Windows Task Scheduler
+- Loads validated recommendation settings from `config.json`
 - Includes automated tests with pytest
 - Retries temporary Spotify and Last.fm failures with exponential backoff
 - Respects Spotify 'Retry-After' responses while avoiding retries that could create duplicate writes
@@ -74,6 +75,8 @@ If there are not enough fresh tracks to create a 30-track playlist, DeepCrate us
 ```text
 deepcrate/
 ├── main.py
+├── config.py
+├── config.json
 ├── spotify_client.py
 ├── lastfm_client.py
 ├── recommender.py
@@ -85,6 +88,7 @@ deepcrate/
 ├── requirements.txt
 ├── README.md
 └── tests/
+    ├── test_config.py
     ├── test_history.py
     ├── test_lastfm_client.py
     ├── test_logging_config.py
@@ -192,6 +196,35 @@ LASTFM_API_KEY=your_lastfm_api_key
 
 Some underground artists may not have Last.fm tags or similar-artist information. DeepCrate handles missing tags by excluding those artists from tag-based clustering.
 
+## Configuration
+
+DeepCrate loads its non-secret behavior settings from `config.json` in the project root.
+
+The configuration controls:
+
+- Spotify listening ranges and the number of top artists retrieved
+- Playlist name, size, and maximum tracks per artist
+- Seed and related-artist discovery limits
+- Minimum weighted genre affinity
+- Ranking variation
+- Track and related-artist cooldown periods
+- Target genres and their relative weights
+
+Higher genre weights make matching tags more influential during seed and related-artist filtering.
+
+DeepCrate validates the configuration at startup. A missing file, malformed JSON, unsupported listening range, or invalid setting causes the run to stop with a descriptive error.
+
+JSON does not support comments or trailing commas. After editing the file, verify the complete application with:
+
+```powershell
+python -m pytest
+python main.py --dry-run
+```
+
+API credentials and keys do not belong in `config.json`. Spotify credentials and the Last.fm API key must remain in `.env`.
+
+The weekly execution time is managed separately through Windows Task Scheduler and is not controlled by `config.json`.
+
 ## Running DeepCrate
 
 ### Interactive mode
@@ -230,7 +263,7 @@ Dry-run mode:
 python main.py --yes
 ```
 
-This skips the confirmation prompt, updates Spotify, and records the selected tracks and related artists in history. 
+This skips the confirmation prompt, updates Spotify, and records the selected tracks and related artists in history.
 It is intended for scheduled execution.
 
 ### Command help
@@ -275,7 +308,8 @@ Artist names are normalized so capitalization differences such as NightFunk and 
 
 By default, related artists used during the previous 42 days are considered recent. DeepCrate prioritizes fresh genre-compatible artists while keeping the least recently used artists available as fallbacks when the fresh pool is limited.
 
-Artist history is saved only after Spotify successfully creates or updates the playlist. Cancelling an interactive run or using --dry-run does not update it.
+Artist history is saved only after Spotify successfully creates or updates the playlist. Cancelling an interactive run or
+using --dry-run does not update it.
 
 ## Freshness Summary
 
@@ -470,7 +504,8 @@ Playlist name: DeepCrate Weekly
 Schedule: Friday at 12:00 AM
 ```
 
-These settings are currently defined in the Python source and can be moved into a configuration file or environment variables in a future milestone.
+These settings are defined in `config.json` and can be changed without editing the Python source. The weekly
+schedule remains part of the Windows Task Scheduler configuration.
 
 ## Known Limitations
 
@@ -490,7 +525,7 @@ These settings are currently defined in the Python source and can be moved into 
 Potential future milestones include:
 
 - Smarter duplicate detection for remasters, radio edits, and alternate releases
-- Configurable playlist size, cooldown period, artist limits, and Spotify listening range
+- Web-based configuration with saved user-specific genre profiles and discovery preferences
 - Improved history retention and cleanup
 - More flexible seed selection from larger groups of highly similar artists
 - A web interface for playlist generation, configuration, and preview

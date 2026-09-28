@@ -1,5 +1,8 @@
 import argparse
 import logging
+from pathlib import Path
+
+from config import DeepCrateConfig, load_config
 
 from lastfm_client import (
     get_artist_tags,
@@ -44,28 +47,7 @@ from logging_config import configure_logging
 
 logger = logging.getLogger("deepcrate")
 
-TOP_ARTIST_TIME_RANGES = (
-    "short_term",
-    "medium_term",
-    "long_term",
-)
-
-TARGET_GENRE_WEIGHTS = {
-    "house": 0.5,
-    "electronic": 0.2,
-    "tech house": 1.0,
-    "deep house": 1.2,
-    "minimal": 1.0,
-    "minimal house": 1.5,
-    "deep tech": 1.5,
-    "microhouse": 2.0,
-    "rominimal": 2.0,
-}
-
-MINIMUM_SEED_ARTISTS = 2
-MINIMUM_GENRE_AFFINITY = 0.15
-RELATED_ARTIST_GENRE_POOL_PER_SEED = 10
-PLAYLIST_SIZE = 30
+DEFAULT_CONFIG_PATH = Path(__file__).with_name("config.json")
 
 
 def parse_args(
@@ -88,10 +70,15 @@ def parse_args(
 
     return parser.parse_args(arguments)
 
+
 def main(
     auto_confirm: bool = False,
     dry_run: bool = False,
+    app_config: DeepCrateConfig | None = None,
 ):
+    if app_config is None:
+        app_config = load_config(DEFAULT_CONFIG_PATH)
+
     print("DeepCrate starting...")
     logger.info("Deepcrate run started")
 
@@ -108,10 +95,10 @@ def main(
     seen_artist_keys = set()
     genre_artist_tags = {}
 
-    for time_range in TOP_ARTIST_TIME_RANGES:
+    for time_range in app_config.spotify.listening_ranges:
         top_artists = get_top_artists(
             spotify,
-            limit=10,
+            limit=app_config.spotify.top_artists_per_range,
             time_range=time_range,
         )
 
@@ -151,7 +138,7 @@ def main(
 
             affinity = calculate_target_genre_affinity(
                 tags,
-                TARGET_GENRE_WEIGHTS,
+                app_config.genre_weights,
             )
 
             print(
@@ -163,16 +150,16 @@ def main(
         genre_artist_tags = (
             filter_artists_by_genre_affinity(
                 artist_tags,
-                TARGET_GENRE_WEIGHTS,
+                app_config.genre_weights,
                 minimum_affinity=(
-                    MINIMUM_GENRE_AFFINITY
+                    app_config.discovery.minimum_genre_affinity
                 ),
             )
         )
 
         if (
             len(genre_artist_tags)
-            >= MINIMUM_SEED_ARTISTS
+            >= app_config.discovery.minimum_seed_artists
         ):
             logger.info(
                 "Found %d genre-compatible top artists "
@@ -190,7 +177,7 @@ def main(
             f"({artist_time_ranges[artist_name]})"
         )
 
-    if len(genre_artist_tags) < MINIMUM_SEED_ARTISTS:
+    if len(genre_artist_tags) < app_config.discovery.minimum_seed_artists:
         logger.warning(
             "Only %d genre-compatible top artists were found",
             len(genre_artist_tags),
@@ -224,7 +211,7 @@ def main(
     for seed_artist in seed_artists:
         recommendations_by_seed[seed_artist] = get_similar_artists(
             seed_artist,
-            limit=20,
+            limit=app_config.discovery.lastfm_recommendations_per_seed,
         )
 
     candidate_artists = merge_similar_artists(
@@ -236,7 +223,7 @@ def main(
         for seed_artist in seed_artists
         for related_artist in (
             recommendations_by_seed[seed_artist][
-                :RELATED_ARTIST_GENRE_POOL_PER_SEED
+                :app_config.discovery.related_artist_genre_pool_per_seed
             ]
         )
     }
@@ -256,7 +243,7 @@ def main(
 
         affinity = calculate_target_genre_affinity(
             tags,
-            TARGET_GENRE_WEIGHTS,
+            app_config.genre_weights,
         )
 
         print(
@@ -268,8 +255,8 @@ def main(
         filter_similar_artists_by_genre_affinity(
             candidate_artists,
             candidate_artist_tags,
-            TARGET_GENRE_WEIGHTS,
-            minimum_affinity=MINIMUM_GENRE_AFFINITY,
+            app_config.genre_weights,
+            minimum_affinity=app_config.discovery.minimum_genre_affinity,
         )
     )
 
@@ -308,7 +295,7 @@ def main(
         spotify_tracks = search_artist_tracks(
             spotify,
             seed_artist,
-            limit=10,
+            limit=app_config.discovery.seed_tracks_per_artist,
         )
 
         for spotify_track in spotify_tracks:
@@ -328,9 +315,6 @@ def main(
         f"\nVerified seed track candidates: "
         f"{len(seed_track_candidates)}"
     )
-
-    related_artists_per_seed = 5
-    tracks_per_related_artist = 10
 
     seed_name_keys = {
         seed_artist.casefold()
@@ -368,7 +352,7 @@ def main(
         prioritized_artists = prioritize_related_artists_by_history(
             compatible_artists_for_seed,
             artist_history,
-            cooldown_days=42,
+            cooldown_days=app_config.history.related_artist_cooldown_days,
         )
 
         selected_for_seed = 0
@@ -383,7 +367,10 @@ def main(
             selected_related_keys.add(artist_key)
             selected_for_seed += 1
 
-            if selected_for_seed == related_artists_per_seed:
+            if (
+                selected_for_seed
+                == app_config.discovery.related_artists_per_seed
+            ):
                 break
 
     print("\nRelated artists selected for track testing:")
@@ -403,7 +390,7 @@ def main(
         spotify_tracks = search_artist_tracks(
             spotify,
             related_artist_name,
-            limit=tracks_per_related_artist,
+            limit=app_config.discovery.related_tracks_per_artist,
         )
 
         for spotify_track in spotify_tracks:
@@ -463,27 +450,29 @@ def main(
 
     varied_candidates = add_ranking_variety(
         ranked_candidates,
-        variation=0.15,
+        variation=app_config.discovery.ranking_variation,
     )
 
     history_filtered_candidates = filter_recent_tracks(
         varied_candidates,
         track_history,
-        cooldown_days=28,
-        target_size=PLAYLIST_SIZE,
+        cooldown_days=app_config.history.track_cooldown_days,
+        target_size=app_config.playlist.size,
     )
 
     final_tracks = build_playlist(
         history_filtered_candidates,
-        target_size=PLAYLIST_SIZE,
-        max_tracks_per_artist=5,
+        target_size=app_config.playlist.size,
+        max_tracks_per_artist=(
+            app_config.playlist.max_tracks_per_artist
+        ),
     )
 
     reused_track_count = sum(
         was_track_used_recently(
             track["spotify_id"],
             track_history,
-            cooldown_days=28,
+            cooldown_days=app_config.history.track_cooldown_days,
         )
         for track in final_tracks
     )
@@ -531,7 +520,7 @@ def main(
             logger.info("Playlist update cancelled by user")
             return
 
-    playlist_name = "DeepCrate Weekly"
+    playlist_name = app_config.playlist.name
 
     track_uris = [
         track["spotify_uri"]
