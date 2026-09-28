@@ -217,6 +217,13 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Personal Word documentation
+docs/*.docx
+
+# Microsoft Word temporary files
+docs/~$*
+docs/*.tmp
+
 # DeepCrate local playlist history
 .deepcrate_history.json
 .deepcrate_history.json.tmp

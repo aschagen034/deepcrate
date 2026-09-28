@@ -202,6 +202,6 @@ def test_project_config_file_is_valid():
     result = load_config(config_path)
 
     assert result.playlist.name == "DeepCrate Weekly"
-    assert result.playlist.size == 30
+    assert result.playlist.size == 50
     assert result.history.track_cooldown_days == 28
     assert result.history.related_artist_cooldown_days == 42

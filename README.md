@@ -5,7 +5,7 @@ DeepCrate is a Python music-discovery application that builds a personalized Spo
 DeepCrate uses the listener's recent Spotify activity as a personalization signal, then filters seed and related artists using Last.fm tags
 associated with several subgenres of house music and adjacent styles.
 
-The result is a focused 30-track discovery playlist that prioritizes fresh tracks while retaining older recommendations as fallback candidates
+The result is a focused discovery playlist containing up to 50 tracks that prioritizes fresh tracks while retaining older recommendations as fallback candidates
 when necessary.
 
 When weekly scheduling is configured, the playlist updates automatically and changes alongside the listener's recent taste.
@@ -60,7 +60,7 @@ DeepCrate follows this recommendation pipeline:
 18. Create or update the `DeepCrate Weekly` Spotify playlist.
 19. Save selected track IDs, related-artist names, and timestamps to local history.
 
-If there are not enough fresh tracks to create a 30-track playlist, DeepCrate uses the oldest recently selected tracks as fallback candidates.
+If there are not enough fresh tracks to reach the target playlist size, DeepCrate reintroduces the oldest recently selected tracks as fallback candidates. The final playlist may still contain fewer than 50 tracks if the eligible candidate pool is limited.
 
 ## Requirements
 
@@ -336,8 +336,8 @@ A successful run includes information such as:
 ```text
 DeepCrate run started
 Collected 90 candidate tracks
-Selected 30 tracks: 18 fresh, 12 recent fallback
-Updated Spotify playlist 'DeepCrate Weekly' with 30 tracks
+Selected 50 tracks: 32 fresh, 18 recent fallback
+Updated Spotify playlist 'DeepCrate Weekly' with 50 tracks
 DeepCrate run completed successfully
 ```
 
@@ -494,8 +494,9 @@ Target genre minimum affinity: 0.15
 Last.fm recommendations per seed: 20
 Related artists checked per seed: 10
 Selected related artists per seed: 5
-Candidate tracks per artist: 10
-Final playlist size: 30
+Seed tracks searched per artist: 10
+Related-artist tracks searched per artist: 10
+Target playlist size: 50
 Maximum final tracks per artist: 5
 Ranking variation: 15%
 Recent-track cooldown: 28 days
@@ -512,7 +513,7 @@ schedule remains part of the Windows Task Scheduler configuration.
 - Recommendation quality depends on Spotify and Last.fm metadata.
 - Some underground artists do not have Last.fm tags.
 - Spotify searches may return remasters, radio edits, alternate editions, or duplicate recordings.
-- A completely fresh 30-track playlist is not guaranteed if the genre-compatible candidate pool is limited.
+- The final playlist may contain fewer than 50 tracks when the eligible candidate pool cannot satisfy the configured genre, uniqueness, and per-artist limits.
 - Last.fm tags are user-generated, so some relevant underground artists may receive low affinity scores or be excluded.
 - Related-artist rotation depends on the size and quality of the genre-compatible Last.fm recommendation pool.
 - DeepCrate expects the listener to have at least two genre-compatible artists across their short-, medium-, or long-term Spotify listening history.
